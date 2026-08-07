@@ -1,0 +1,19 @@
+# IntelliJ IDEA specific files
+.idea/
+
+# Build output (Maven or Gradle)
+target/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+
+# Compiled class files
+*.class
+
+# Eclipse-specific files
+.classpath
+.project

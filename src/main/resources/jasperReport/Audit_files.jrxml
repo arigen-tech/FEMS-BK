@@ -1,0 +1,522 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Created with Jaspersoft Studio version 6.21.2.final using JasperReports Library version 6.20.1  -->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="audit_files_report" pageWidth="842" pageHeight="595" orientation="Landscape" whenNoDataType="NoDataSection" columnWidth="802" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" uuid="da034cd6-2069-4727-93c9-39d8f952fcdb">
+	<property name="com.jaspersoft.studio.data.defaultdataadapter" value="dms_db"/>
+	<property name="com.jaspersoft.studio.data.sql.tables" value=""/>
+	<parameter name="branch_id" class="java.lang.Integer">
+		<defaultValueExpression><![CDATA[new Integer(0)]]></defaultValueExpression>
+	</parameter>
+	<parameter name="department_id" class="java.lang.Integer">
+		<defaultValueExpression><![CDATA[new Integer(0)]]></defaultValueExpression>
+	</parameter>
+	<parameter name="employee_id" class="java.lang.Integer">
+		<defaultValueExpression><![CDATA[new Integer(0)]]></defaultValueExpression>
+	</parameter>
+	<parameter name="category_id" class="java.lang.Integer">
+		<defaultValueExpression><![CDATA[new Integer(0)]]></defaultValueExpression>
+	</parameter>
+	<parameter name="from_date" class="java.util.Date"/>
+	<parameter name="to_date" class="java.util.Date"/>
+	<parameter name="action_type" class="java.lang.String">
+		<defaultValueExpression><![CDATA["AUDIT"]]></defaultValueExpression>
+	</parameter>
+	<parameter name="path" class="java.lang.String">
+		<defaultValueExpression><![CDATA["/Users/rozaltheric/Downloads/arigen_docs.png"]]></defaultValueExpression>
+	</parameter>
+	<queryString>
+		<![CDATA[select 
+	bm.address as branch_name,
+    dm.name as department_name,
+    cm.name as category_name,
+    date_format(hd.action_date, '%d/%m/%Y %h:%i %p') as date_time,
+    emp.name as user_name,
+    hd.user_role,
+    hd.action_type,
+    hd.document_name,
+    hd.title,
+    hd.subject,
+    hd.category,
+    hd.file_name,
+    hd.version,
+    hd.ip_address
+from document_activity_report hd
+left join category_master cm on hd.category_id = cm.id
+left join branch_master bm on hd.branch_id = bm.id
+left join department_master dm on hd.department_id = dm.id
+left join employee emp on hd.emp_id = emp.id
+where 1=1
+and hd.status = 'SUCCESS'
+and ( 
+	( $P{action_type} = 'AUDIT'
+     	and hd.action_type in ('UPLOAD', 'APPROVE', 'REJECT', 'DOWNLOAD', 'RETRIEVE', 'ARCHIVE', 'TRASH', 'UNTRASH', 'VIEW')
+ 	)
+	or hd.action_type = $P{action_type}
+)
+and (hd.branch_id = $P{branch_id} or $P{branch_id} = 0)
+and (hd.department_id = $P{department_id} or $P{department_id} = 0)
+and (hd.emp_id = $P{employee_id} or $P{employee_id} = 0)
+and (hd.category_id = $P{category_id} or $P{category_id} = 0)
+and ($P{from_date} is null or hd.created_at >= $P{from_date})
+and ($P{to_date} is null or hd.created_at <= $P{to_date})]]>
+	</queryString>
+	<field name="branch_name" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="address"/>
+		<property name="com.jaspersoft.studio.field.label" value="branch_name"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="branch_master"/>
+	</field>
+	<field name="department_name" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="name"/>
+		<property name="com.jaspersoft.studio.field.label" value="department_name"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="department_master"/>
+	</field>
+	<field name="category_name" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="name"/>
+		<property name="com.jaspersoft.studio.field.label" value="category_name"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="category_master"/>
+	</field>
+	<field name="date_time" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="date_time"/>
+		<property name="com.jaspersoft.studio.field.label" value="date_time"/>
+	</field>
+	<field name="user_name" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="user_name"/>
+		<property name="com.jaspersoft.studio.field.label" value="user_name"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="employee"/>
+	</field>
+	<field name="user_role" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="USER_ROLE"/>
+		<property name="com.jaspersoft.studio.field.label" value="user_role"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="document_activity_report"/>
+	</field>
+	<field name="action_type" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="action_type"/>
+		<property name="com.jaspersoft.studio.field.label" value="action_type"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="document_activity_report"/>
+	</field>
+	<field name="document_name" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="DOCUMENT_NAME"/>
+		<property name="com.jaspersoft.studio.field.label" value="document_name"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="document_activity_report"/>
+	</field>
+	<field name="title" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="TITLE"/>
+		<property name="com.jaspersoft.studio.field.label" value="title"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="document_activity_report"/>
+	</field>
+	<field name="subject" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="SUBJECT"/>
+		<property name="com.jaspersoft.studio.field.label" value="subject"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="document_activity_report"/>
+	</field>
+	<field name="category" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="CATEGORY"/>
+		<property name="com.jaspersoft.studio.field.label" value="category"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="document_activity_report"/>
+	</field>
+	<field name="file_name" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="FILE_NAME"/>
+		<property name="com.jaspersoft.studio.field.label" value="file_name"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="document_activity_report"/>
+	</field>
+	<field name="version" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="VERSION"/>
+		<property name="com.jaspersoft.studio.field.label" value="version"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="document_activity_report"/>
+	</field>
+	<field name="ip_address" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="IP_ADDRESS"/>
+		<property name="com.jaspersoft.studio.field.label" value="ip_address"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="document_activity_report"/>
+	</field>
+	<variable name="S.No." class="java.lang.Integer" calculation="Count">
+		<variableExpression><![CDATA[new Integer(0)]]></variableExpression>
+	</variable>
+	<background>
+		<band splitType="Stretch"/>
+	</background>
+	<title>
+		<band height="52" splitType="Stretch">
+			<staticText>
+				<reportElement x="0" y="16" width="802" height="19" uuid="b92eb2f7-f476-4263-b798-62796ae43409"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font size="10" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Audit Files Report]]></text>
+			</staticText>
+			<image scaleImage="RealHeight">
+				<reportElement x="8" y="7" width="160" height="45" uuid="a56b8da7-8b5f-4d3c-aeaa-1b7b7b802fb0"/>
+				<imageExpression><![CDATA[$P{path}]]></imageExpression>
+			</image>
+		</band>
+	</title>
+	<pageHeader>
+		<band height="59" splitType="Stretch">
+			<!-- Branch Filter (shows only if branch_id parameter is not 0) -->
+			<staticText>
+				<reportElement x="5" y="4" width="80" height="14">
+					<printWhenExpression><![CDATA[$P{branch_id} != 0]]></printWhenExpression>
+				</reportElement>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Branch]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="87" y="4" width="170" height="14">
+					<printWhenExpression><![CDATA[$P{branch_id} != 0]]></printWhenExpression>
+				</reportElement>
+				<textElement>
+					<font size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{branch_name}]]></textFieldExpression>
+			</textField>
+
+			<!-- Department Filter (shows only if department_id parameter is not 0) -->
+			<staticText>
+				<reportElement x="5" y="21" width="80" height="14">
+					<printWhenExpression><![CDATA[$P{department_id} != 0]]></printWhenExpression>
+				</reportElement>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Department]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="87" y="21" width="170" height="14">
+					<printWhenExpression><![CDATA[$P{department_id} != 0]]></printWhenExpression>
+				</reportElement>
+				<textElement>
+					<font size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{department_name}]]></textFieldExpression>
+			</textField>
+
+			<!-- Category Filter (shows only if category_id parameter is not 0) -->
+			<staticText>
+				<reportElement x="5" y="39" width="80" height="14">
+					<printWhenExpression><![CDATA[$P{category_id} != 0]]></printWhenExpression>
+				</reportElement>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Category]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="87" y="39" width="170" height="14">
+					<printWhenExpression><![CDATA[$P{category_id} != 0]]></printWhenExpression>
+				</reportElement>
+				<textElement>
+					<font size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{category_name}]]></textFieldExpression>
+			</textField>
+
+			<!-- Report Range (always shows, using the style from trash report) -->
+			<textField>
+				<reportElement x="530" y="4" width="262" height="14"/>
+				<textElement textAlignment="Left">
+					<font size="8" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[
+"Report Range: " + 
+new java.text.SimpleDateFormat("dd/MM/yyyy").format($P{from_date}) +
+" to " +
+new java.text.SimpleDateFormat("dd/MM/yyyy").format($P{to_date})
+]]></textFieldExpression>
+			</textField>
+
+			<!-- Generated On -->
+			<staticText>
+				<reportElement x="530" y="39" width="80" height="14"/>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Generated on]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="613" y="39" width="179" height="14"/>
+				<textElement>
+					<font size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA[
+new java.text.SimpleDateFormat("dd/MM/yyyy hh:mm a")
+.format(new java.util.Date()).toUpperCase()
+]]></textFieldExpression>
+			</textField>
+		</band>
+	</pageHeader>
+	<columnHeader>
+		<band height="26" splitType="Stretch">
+			<staticText>
+				<reportElement x="3" y="5" width="22" height="20"/>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[S No.]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="29" y="5" width="65" height="20"/>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Date and Time]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="98" y="5" width="55" height="20"/>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[User]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="157" y="5" width="45" height="20"/>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Role]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="206" y="5" width="45" height="20"/>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Action]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="255" y="5" width="60" height="20"/>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Document No.]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="319" y="5" width="55" height="20"/>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Title]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="378" y="5" width="50" height="20"/>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Subject]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="432" y="5" width="55" height="20"/>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Category]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="491" y="5" width="145" height="20"/>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[File Name]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="640" y="5" width="40" height="20"/>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Version]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="684" y="5" width="80" height="20"/>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[IP Address]]></text>
+			</staticText>
+			<line>
+				<reportElement x="0" y="3" width="802" height="1"/>
+			</line>
+			<line>
+				<reportElement x="0" y="25" width="802" height="1"/>
+			</line>
+			<line>
+				<reportElement x="27" y="3" width="1" height="23"/>
+			</line>
+			<line>
+				<reportElement x="95" y="3" width="1" height="23"/>
+			</line>
+			<line>
+				<reportElement x="154" y="3" width="1" height="23"/>
+			</line>
+			<line>
+				<reportElement x="203" y="3" width="1" height="23"/>
+			</line>
+			<line>
+				<reportElement x="252" y="3" width="1" height="23"/>
+			</line>
+			<line>
+				<reportElement x="316" y="3" width="1" height="23"/>
+			</line>
+			<line>
+				<reportElement x="375" y="3" width="1" height="23"/>
+			</line>
+			<line>
+				<reportElement x="429" y="3" width="1" height="23"/>
+			</line>
+			<line>
+				<reportElement x="488" y="3" width="1" height="23"/>
+			</line>
+			<line>
+				<reportElement x="637" y="3" width="1" height="23"/>
+			</line>
+			<line>
+				<reportElement x="681" y="3" width="1" height="23"/>
+			</line>
+			<line>
+				<reportElement x="801" y="3" width="1" height="23"/>
+			</line>
+			<line>
+				<reportElement x="0" y="3" width="1" height="23"/>
+			</line>
+		</band>
+	</columnHeader>
+	<detail>
+		<band height="23" splitType="Stretch">
+			<line>
+				<reportElement x="0" y="22" width="802" height="1"/>
+			</line>
+			<line>
+				<reportElement x="0" y="-4" width="1" height="27"/>
+			</line>
+			<line>
+				<reportElement x="801" y="-4" width="1" height="27"/>
+			</line>
+			<line>
+				<reportElement x="27" y="-4" width="1" height="27"/>
+			</line>
+			<line>
+				<reportElement x="95" y="-4" width="1" height="27"/>
+			</line>
+			<line>
+				<reportElement x="154" y="-4" width="1" height="27"/>
+			</line>
+			<line>
+				<reportElement x="203" y="-4" width="1" height="27"/>
+			</line>
+			<line>
+				<reportElement x="252" y="-4" width="1" height="27"/>
+			</line>
+			<line>
+				<reportElement x="316" y="-4" width="1" height="27"/>
+			</line>
+			<line>
+				<reportElement x="375" y="-4" width="1" height="27"/>
+			</line>
+			<line>
+				<reportElement x="429" y="-4" width="1" height="27"/>
+			</line>
+			<line>
+				<reportElement x="488" y="-4" width="1" height="27"/>
+			</line>
+			<line>
+				<reportElement x="637" y="-4" width="1" height="27"/>
+			</line>
+			<line>
+				<reportElement x="681" y="-4" width="1" height="27"/>
+			</line>
+			<textField>
+				<reportElement x="3" y="2" width="22" height="20"/>
+				<textElement>
+					<font size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$V{S.No.}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="29" y="2" width="65" height="20"/>
+				<textElement>
+					<font size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{date_time} == null ? "" : $F{date_time}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="98" y="2" width="55" height="20"/>
+				<textElement>
+					<font size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{user_name} == null ? "" : $F{user_name}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="157" y="2" width="45" height="20"/>
+				<textElement>
+					<font size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{user_role} == null ? "" : $F{user_role}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="206" y="2" width="45" height="20"/>
+				<textElement>
+					<font size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{action_type} == null ? "" : $F{action_type}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="255" y="2" width="60" height="20"/>
+				<textElement>
+					<font size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{document_name} == null ? "" : $F{document_name}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="319" y="2" width="55" height="20"/>
+				<textElement>
+					<font size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{title} == null ? "" : $F{title}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="378" y="2" width="50" height="20"/>
+				<textElement>
+					<font size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{subject} == null ? "" : $F{subject}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="432" y="2" width="55" height="20"/>
+				<textElement>
+					<font size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{category} == null ? "" : $F{category}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="491" y="2" width="145" height="20"/>
+				<textElement>
+					<font size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{file_name} == null ? "" : $F{file_name}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="640" y="2" width="40" height="20"/>
+				<textElement>
+					<font size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{version} == null ? "" : $F{version}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="684" y="2" width="80" height="20"/>
+				<textElement>
+					<font size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{ip_address} == null ? "" : $F{ip_address}]]></textFieldExpression>
+			</textField>
+		</band>
+	</detail>
+	<noData>
+		<band height="22">
+			<staticText>
+				<reportElement x="0" y="3" width="802" height="19" uuid="bce88a0c-7343-4ce8-a363-a9f9f57fdc41"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font size="10" isBold="true"/>
+				</textElement>
+				<text><![CDATA[NO RECORDS FOUND]]></text>
+			</staticText>
+		</band>
+	</noData>
+</jasperReport>

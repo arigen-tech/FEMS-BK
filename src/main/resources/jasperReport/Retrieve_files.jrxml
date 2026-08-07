@@ -1,0 +1,498 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Created with Jaspersoft Studio version 6.21.2.final using JasperReports Library version 6.20.1  -->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="retrieved_files_report" pageWidth="595" pageHeight="842" whenNoDataType="NoDataSection" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" uuid="da034cd6-2069-4727-93c9-39d8f952fcdb">
+	<property name="com.jaspersoft.studio.data.defaultdataadapter" value="dms_db"/>
+	<property name="com.jaspersoft.studio.data.sql.tables" value=""/>
+	<parameter name="branch_id" class="java.lang.Integer">
+		<defaultValueExpression><![CDATA[new Integer(0)]]></defaultValueExpression>
+	</parameter>
+	<parameter name="department_id" class="java.lang.Integer">
+		<defaultValueExpression><![CDATA[new Integer(0)]]></defaultValueExpression>
+	</parameter>
+	<parameter name="employee_id" class="java.lang.Integer">
+		<defaultValueExpression><![CDATA[new Integer(0)]]></defaultValueExpression>
+	</parameter>
+	<parameter name="category_id" class="java.lang.Integer">
+		<defaultValueExpression><![CDATA[new Integer(0)]]></defaultValueExpression>
+	</parameter>
+	<parameter name="from_date" class="java.util.Date"/>
+	<parameter name="to_date" class="java.util.Date"/>
+	<parameter name="action_type" class="java.lang.String">
+		<defaultValueExpression><![CDATA["RETRIEVE"]]></defaultValueExpression>
+	</parameter>
+	<parameter name="path" class="java.lang.String">
+		<defaultValueExpression><![CDATA["/Users/rozaltheric/Downloads/arigen_docs.png"]]></defaultValueExpression>
+	</parameter>
+	<queryString>
+		<![CDATA[select 
+	bm.address as branch_name,
+    dm.name as department_name,
+    cm.name as category_name,
+    hd.document_name,
+    hd.title,
+    hd.subject,
+    hd.category,
+    hd.file_name,
+    hd.version,
+    hd.file_size,
+    hd.action_by,
+    hd.location,
+    hd.job_id,
+    hd.action_type
+from document_activity_report hd
+left join category_master cm on hd.category_id = cm.id
+left join branch_master bm on hd.branch_id = bm.id
+left join department_master dm on hd.department_id = dm.id
+left join employee emp on hd.emp_id = emp.id
+where 1=1
+and hd.status = 'SUCCESS'
+and hd.action_type = 'RETRIEVE'
+and (hd.branch_id = $P{branch_id} or $P{branch_id} = 0)
+and (hd.department_id = $P{department_id} or $P{department_id} = 0)
+and (hd.emp_id = $P{employee_id} or $P{employee_id} = 0)
+and (hd.category_id = $P{category_id} or $P{category_id} = 0)
+and ($P{from_date} is null or hd.created_at >= $P{from_date})
+and ($P{to_date} is null or hd.created_at <= $P{to_date})]]>
+	</queryString>
+	<field name="branch_name" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="address"/>
+		<property name="com.jaspersoft.studio.field.label" value="branch_name"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="branch_master"/>
+	</field>
+	<field name="department_name" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="name"/>
+		<property name="com.jaspersoft.studio.field.label" value="department_name"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="department_master"/>
+	</field>
+	<field name="category_name" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="name"/>
+		<property name="com.jaspersoft.studio.field.label" value="category_name"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="category_master"/>
+	</field>
+	<field name="document_name" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="DOCUMENT_NAME"/>
+		<property name="com.jaspersoft.studio.field.label" value="document_name"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="document_activity_report"/>
+	</field>
+	<field name="title" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="TITLE"/>
+		<property name="com.jaspersoft.studio.field.label" value="title"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="document_activity_report"/>
+	</field>
+	<field name="subject" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="SUBJECT"/>
+		<property name="com.jaspersoft.studio.field.label" value="subject"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="document_activity_report"/>
+	</field>
+	<field name="category" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="CATEGORY"/>
+		<property name="com.jaspersoft.studio.field.label" value="category"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="document_activity_report"/>
+	</field>
+	<field name="file_name" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="FILE_NAME"/>
+		<property name="com.jaspersoft.studio.field.label" value="file_name"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="document_activity_report"/>
+	</field>
+	<field name="version" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="VERSION"/>
+		<property name="com.jaspersoft.studio.field.label" value="version"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="document_activity_report"/>
+	</field>
+	<field name="file_size" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="FILE_SIZE"/>
+		<property name="com.jaspersoft.studio.field.label" value="file_size"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="document_activity_report"/>
+	</field>
+	<field name="action_by" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="ACTION_BY"/>
+		<property name="com.jaspersoft.studio.field.label" value="action_by"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="document_activity_report"/>
+	</field>
+	<field name="location" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="LOCATION"/>
+		<property name="com.jaspersoft.studio.field.label" value="location"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="document_activity_report"/>
+	</field>
+	<field name="job_id" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="JOB_ID"/>
+		<property name="com.jaspersoft.studio.field.label" value="job_id"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="document_activity_report"/>
+	</field>
+	<field name="action_type" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="action_type"/>
+		<property name="com.jaspersoft.studio.field.label" value="action_type"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="document_activity_report"/>
+	</field>
+	<variable name="S.No." class="java.lang.Integer" calculation="Count">
+		<variableExpression><![CDATA[new Integer(0)]]></variableExpression>
+	</variable>
+	<background>
+		<band splitType="Stretch"/>
+	</background>
+	<title>
+		<band height="52" splitType="Stretch">
+			<staticText>
+				<reportElement x="5" y="16" width="555" height="19" uuid="b92eb2f7-f476-4263-b798-62796ae43409"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font size="10" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Retrieved Files Report]]></text>
+			</staticText>
+			<image scaleImage="RealHeight">
+				<reportElement x="8" y="7" width="160" height="45" uuid="a56b8da7-8b5f-4d3c-aeaa-1b7b7b802fb0"/>
+				<imageExpression><![CDATA[$P{path}]]></imageExpression>
+			</image>
+		</band>
+	</title>
+	<pageHeader>
+		<band height="59" splitType="Stretch">
+			<!-- Branch Filter (shows only if branch_id parameter is not 0) -->
+			<staticText>
+				<reportElement x="5" y="4" width="80" height="14">
+					<printWhenExpression><![CDATA[$P{branch_id} != 0]]></printWhenExpression>
+				</reportElement>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Branch]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="87" y="4" width="170" height="14">
+					<printWhenExpression><![CDATA[$P{branch_id} != 0]]></printWhenExpression>
+				</reportElement>
+				<textElement>
+					<font size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{branch_name}]]></textFieldExpression>
+			</textField>
+
+			<!-- Department Filter (shows only if department_id parameter is not 0) -->
+			<staticText>
+				<reportElement x="5" y="21" width="80" height="14">
+					<printWhenExpression><![CDATA[$P{department_id} != 0]]></printWhenExpression>
+				</reportElement>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Department]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="87" y="21" width="170" height="14">
+					<printWhenExpression><![CDATA[$P{department_id} != 0]]></printWhenExpression>
+				</reportElement>
+				<textElement>
+					<font size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{department_name}]]></textFieldExpression>
+			</textField>
+
+			<!-- Category Filter (shows only if category_id parameter is not 0) -->
+			<staticText>
+				<reportElement x="5" y="39" width="80" height="14">
+					<printWhenExpression><![CDATA[$P{category_id} != 0]]></printWhenExpression>
+				</reportElement>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Category]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="87" y="39" width="170" height="14">
+					<printWhenExpression><![CDATA[$P{category_id} != 0]]></printWhenExpression>
+				</reportElement>
+				<textElement>
+					<font size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{category_name}]]></textFieldExpression>
+			</textField>
+
+			<!-- Report Range (always shows, using the style from trash report) -->
+			<textField>
+				<reportElement x="330" y="4" width="217" height="14"/>
+				<textElement textAlignment="Left">
+					<font size="8" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[
+"Report Range: " + 
+new java.text.SimpleDateFormat("dd/MM/yyyy").format($P{from_date}) +
+" to " +
+new java.text.SimpleDateFormat("dd/MM/yyyy").format($P{to_date})
+]]></textFieldExpression>
+			</textField>
+
+			<!-- Generated On -->
+			<staticText>
+				<reportElement x="330" y="39" width="80" height="14"/>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Generated on]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="413" y="39" width="134" height="14"/>
+				<textElement>
+					<font size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA[
+new java.text.SimpleDateFormat("dd/MM/yyyy hh:mm a")
+.format(new java.util.Date()).toUpperCase()
+]]></textFieldExpression>
+			</textField>
+		</band>
+	</pageHeader>
+	<columnHeader>
+		<band height="26" splitType="Stretch">
+			<staticText>
+				<reportElement x="3" y="5" width="22" height="20" uuid="f605bca9-51e9-4732-b2c6-90a97f91e588"/>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[S No.]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="29" y="5" width="50" height="20" uuid="6daf8bb8-e008-4ef8-aeec-fd9f3dadb3ca"/>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Document No.]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="83" y="5" width="46" height="20" uuid="a8c20d70-71ca-4956-85a9-99f8ca6a2f1b"/>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Title]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="131" y="5" width="33" height="20" uuid="e73c5ead-475e-4732-b286-eacba182f0dd"/>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Subject]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="169" y="5" width="45" height="20" uuid="75f8c8c8-1dd0-48ff-81f0-b67986c0c2f8"/>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Category]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="218" y="5" width="112" height="20" uuid="524213a7-7109-4f6a-8548-a8c6639e6983"/>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[File Name]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="334" y="5" width="32" height="20" uuid="da881a7f-d7c8-415a-8238-d6aad6bb2fcd"/>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Version]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="371" y="5" width="36" height="20" uuid="65850305-3687-4504-8a09-b118b451a28a"/>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[File Size]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="412" y="5" width="54" height="20" uuid="14297570-1e3c-45c3-9bc8-d048955b0077"/>
+				<textElement markup="none">
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Retrieved By]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="471" y="5" width="45" height="20" uuid="462519f9-aa62-4407-be5d-c706a7c79862"/>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Retrieve Path]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="520" y="5" width="34" height="20" uuid="1d32ada1-a2b1-4095-9c5e-a958ddea6ebd"/>
+				<textElement>
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Job ID]]></text>
+			</staticText>
+			<line>
+				<reportElement x="0" y="3" width="555" height="1" uuid="5d014970-b2c7-4293-a515-b98301ab7023"/>
+			</line>
+			<line>
+				<reportElement x="0" y="25" width="555" height="1" uuid="1e788236-d2cb-4357-976b-eb5b8eb45b0a"/>
+			</line>
+			<line>
+				<reportElement x="27" y="3" width="1" height="23" uuid="114628f5-705a-4ba5-8195-82d3abedc61e"/>
+			</line>
+			<line>
+				<reportElement x="80" y="3" width="1" height="23" uuid="821e715d-82c6-44cf-8d97-72616c7523dd"/>
+			</line>
+			<line>
+				<reportElement x="128" y="3" width="1" height="23" uuid="875b4677-48cc-40c2-91ad-2ba921c216bc"/>
+			</line>
+			<line>
+				<reportElement x="165" y="3" width="1" height="23" uuid="2c1f283e-9919-43f6-9472-a75799aadeed"/>
+			</line>
+			<line>
+				<reportElement x="215" y="3" width="1" height="23" uuid="5b6b77f9-7b48-4f0b-82ce-06758bad7b4a"/>
+			</line>
+			<line>
+				<reportElement x="331" y="3" width="1" height="23" uuid="69d370fb-6853-4719-a8f0-a3ba0e2b28f7"/>
+			</line>
+			<line>
+				<reportElement x="368" y="3" width="1" height="23" uuid="3700738e-5921-4886-8b27-4a2abe81a533"/>
+			</line>
+			<line>
+				<reportElement x="409" y="3" width="1" height="23" uuid="34b06434-7b8c-4462-b8dd-f9d689265207"/>
+			</line>
+			<line>
+				<reportElement x="468" y="3" width="1" height="23" uuid="cc0975c0-2a3d-42db-a971-4d92e6505de2"/>
+			</line>
+			<line>
+				<reportElement x="518" y="3" width="1" height="23" uuid="c120d6e1-6fc8-4a86-b602-aa83bcf096b9"/>
+			</line>
+			<line>
+				<reportElement x="554" y="3" width="1" height="23" uuid="ca14651b-ecae-4a8b-b7c4-4bfa5ed499a0"/>
+			</line>
+			<line>
+				<reportElement x="0" y="3" width="1" height="23" uuid="bec62d4e-bf74-44ae-941c-37e6001c92ae"/>
+			</line>
+		</band>
+	</columnHeader>
+	<detail>
+		<band height="23" splitType="Stretch">
+			<line>
+				<reportElement x="0" y="22" width="555" height="1" uuid="7ea39550-c35a-456d-ac52-f72f7cb06894"/>
+			</line>
+			<line>
+				<reportElement x="0" y="-4" width="1" height="27" uuid="b2754daa-5274-4157-bc6e-681e0fa3a495"/>
+			</line>
+			<line>
+				<reportElement x="554" y="-4" width="1" height="27" uuid="a02289fc-d89f-4960-a379-7a9924af5bc4"/>
+			</line>
+			<line>
+				<reportElement x="468" y="-4" width="1" height="27" uuid="758f6916-e775-4766-bc27-79efb5c782d2"/>
+			</line>
+			<line>
+				<reportElement x="80" y="-4" width="1" height="27" uuid="ea6f5d71-fa02-432c-8dbb-d49f1580f64a"/>
+			</line>
+			<line>
+				<reportElement x="215" y="-4" width="1" height="27" uuid="ebd64328-a0a4-4848-aeac-98cd660b6e54"/>
+			</line>
+			<line>
+				<reportElement x="368" y="-4" width="1" height="27" uuid="84d4176b-5333-4552-8c22-b202e9c1b965"/>
+			</line>
+			<line>
+				<reportElement x="331" y="-4" width="1" height="27" uuid="e581e295-60c1-4112-a8b4-ed92f9f6e39b"/>
+			</line>
+			<line>
+				<reportElement x="165" y="-4" width="1" height="27" uuid="3dfdf7dd-765a-4d49-a22e-36055653c7d0"/>
+			</line>
+			<line>
+				<reportElement x="27" y="-4" width="1" height="27" uuid="b1f21a0a-142c-4eac-aba6-c54c12176b68"/>
+			</line>
+			<line>
+				<reportElement x="128" y="-4" width="1" height="27" uuid="b3186c15-1ce6-46a9-9d85-7371113f67ec"/>
+			</line>
+			<line>
+				<reportElement x="409" y="-4" width="1" height="27" uuid="20ec27b9-cf6c-4ed1-94bd-263875c82471"/>
+			</line>
+			<line>
+				<reportElement x="518" y="-4" width="1" height="27" uuid="948a9d13-272c-4df0-871f-80d4fb8c2f0a"/>
+			</line>
+			<textField>
+				<reportElement x="3" y="2" width="22" height="20" uuid="c715629c-f750-40de-a444-494824d286bc"/>
+				<textElement>
+					<font size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$V{S.No.}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="29" y="2" width="50" height="20" uuid="6fadf5d2-0bd3-4eea-bfe3-eb3a09e9a262"/>
+				<textElement>
+					<font size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{document_name} == null ? "" : $F{document_name}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="83" y="2" width="45" height="20" uuid="f4ea55c6-cd91-4821-af85-2f093feb5b98"/>
+				<textElement>
+					<font size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{title} == null ? "" : $F{title}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="131" y="2" width="33" height="20" uuid="3c4a2500-17f0-420f-be57-0b70a5bc2ed7"/>
+				<textElement>
+					<font size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{subject} == null ? "" : $F{subject}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="169" y="2" width="45" height="20" uuid="c98dad18-dd7a-48a1-ae7d-50fa48df52ba"/>
+				<textElement>
+					<font size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{category} == null ? "" : $F{category}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="218" y="2" width="112" height="20" uuid="c2182085-4364-4043-9454-3bba8178f20e"/>
+				<textElement>
+					<font size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{file_name} == null ? "" : $F{file_name}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="334" y="2" width="32" height="20" uuid="1ceabb8c-0b90-4600-b4df-232eb3045af3"/>
+				<textElement>
+					<font size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{version} == null ? "" : $F{version}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="371" y="2" width="36" height="20" uuid="051fa013-a642-4e2a-8a04-a7efc552adf9"/>
+				<textElement>
+					<font size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{file_size} == null ? "" : $F{file_size}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="412" y="2" width="54" height="20" uuid="c70c7ea8-c1ad-48e3-9c8c-b64c1e3d61ba"/>
+				<textElement>
+					<font size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{action_by} == null ? "" : $F{action_by}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="471" y="2" width="45" height="20" uuid="58edfd53-0549-4828-803a-e44df02d65db"/>
+				<textElement>
+					<font size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{location} == null ? "" : $F{location}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="520" y="2" width="34" height="20" uuid="04561163-cf91-449f-b84c-3cd89fcdcf07"/>
+				<textElement>
+					<font size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{job_id} == null ? "" : $F{job_id}]]></textFieldExpression>
+			</textField>
+		</band>
+	</detail>
+	<noData>
+		<band height="22">
+			<staticText>
+				<reportElement x="5" y="3" width="555" height="19" uuid="bce88a0c-7343-4ce8-a363-a9f9f57fdc41"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font size="10" isBold="true"/>
+				</textElement>
+				<text><![CDATA[NO RECORDS FOUND]]></text>
+			</staticText>
+		</band>
+	</noData>
+</jasperReport>

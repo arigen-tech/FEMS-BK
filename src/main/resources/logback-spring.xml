@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="true">
+
+    <property name="LOG_PATH" value="./logs"/>
+    <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"/>
+
+    <!-- Console Appender -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Rolling File Appender with Daily Rotation -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <!-- Main active log file -->
+        <file>${LOG_PATH}/dms.log</file>
+
+        <!-- Rolling Policy: Creates new file each day -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- File name pattern with DATE - creates dms-2026-01-29.log, dms-2026-01-30.log, etc -->
+            <fileNamePattern>${LOG_PATH}/dms-%d{yyyy-MM-dd}.log</fileNamePattern>
+
+            <!-- Keep logs for 30 days, then delete old ones -->
+            <maxHistory>30</maxHistory>
+
+            <!-- Total size limit for all log files (optional) -->
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+
+        <!-- Don't overwrite on startup -->
+        <prudent>true</prudent>
+    </appender>
+
+    <!-- Root Logger -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </root>
+
+    <!-- Package Logger for your application (more detailed logs) -->
+    <logger name="com.dmsBackend" level="DEBUG"/>
+
+</configuration>
