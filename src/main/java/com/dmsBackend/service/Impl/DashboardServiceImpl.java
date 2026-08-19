@@ -83,14 +83,13 @@ public class DashboardServiceImpl implements DashboardService {
         Integer branchId = employee.getBranch() != null ? employee.getBranch().getId() : null;
         Integer departmentId = employee.getDepartment() != null ? employee.getDepartment().getId() : null;
 
-        System.out.println("========== DASHBOARD DEBUG START ==========");
-        System.out.println("Employee ID: " + empId);
-        System.out.println("Employee Name: " + employee.getName());
-
         log.debug("Employee: {} | Branch ID: {} | Department ID: {}",
                 employee.getName(), branchId, departmentId);
 
-        // Set general counts
+        // ───────── General (system-wide) counts ─────────
+        // NOTE: totalDocument / pendingDocument below are kept as-is from your
+        // original code (detail-row counts) since they're used only as raw
+        // storage/file stats, not as the case-approval badges shown in the sidebar.
         dashboardResponse.setTotalUser(employeeRepository.count());
         dashboardResponse.setTotalDocument(documentDetailRepository.countTotalDetails());
         dashboardResponse.setPendingDocument(documentDetailRepository.count());
@@ -102,9 +101,12 @@ public class DashboardServiceImpl implements DashboardService {
         dashboardResponse.setDocumentType(typeMasterRepository.count());
         dashboardResponse.setAnnualYear(yearMasterRepository.count());
         dashboardResponse.setTotalCategories(categoryMasterRepository.count());
-        dashboardResponse.setTotalApprovedDocuments(documentDetailsService.countApprovedDetails(DocApprovalStatus.APPROVED));
-        dashboardResponse.setTotalRejectedDocuments(documentDetailsService.countApprovedDetails(DocApprovalStatus.REJECTED));
-        dashboardResponse.setTotalPendingDocuments(documentDetailsService.countApprovedDetails(DocApprovalStatus.PENDING));
+
+        // ───────── HEADER-LEVEL (case-level) approval counts — system-wide ─────────
+        dashboardResponse.setTotalApprovedDocuments(documentHeaderService.countApprovedDocuments());
+        dashboardResponse.setTotalRejectedDocuments(documentHeaderService.countRejectedDocuments());
+        dashboardResponse.setTotalPendingDocuments(documentHeaderService.countPendingDocuments());
+
         dashboardResponse.setTotalNullEmployeeType(employeeService.countEmployeesByRoleNull());
         dashboardResponse.setTotalLanguage(languageMasterRepository.count());
 
@@ -115,19 +117,15 @@ public class DashboardServiceImpl implements DashboardService {
         long createdByCount = employeeRepository.countByCreatedById(empId);
         dashboardResponse.setCreatedByCount(createdByCount);
 
-        // Approval status lists
-        DocApprovalStatus pendingStatuses = DocApprovalStatus.PENDING;
-        DocApprovalStatus approvedStatuses = DocApprovalStatus.APPROVED;
-        DocApprovalStatus rejectedStatuses = DocApprovalStatus.REJECTED;
-
-        // Employee document counts
-        long pendingCount = documentDetailRepository.countApprovedDetailsByEmployee(empId, pendingStatuses);
-        long approvedCount = documentDetailRepository.countApprovedDetailsByEmployee(empId, approvedStatuses);
-        long rejectedCount = documentDetailRepository.countApprovedDetailsByEmployee(empId, rejectedStatuses);
+        // ───────── HEADER-LEVEL (case-level) counts for the logged-in employee ─────────
+        long pendingCount = documentHeaderService.countPendingDocumentsByEmployeeId(empId);
+        long approvedCount = documentHeaderService.countApprovedDocumentsByEmployeeId(empId);
+        long rejectedCount = documentHeaderService.countRejectedDocumentsByEmployeeId(empId);
 
         dashboardResponse.setPendingDocsbyid(pendingCount);
         dashboardResponse.setApprovedDocsbyid(approvedCount);
         dashboardResponse.setRejectedDocsbyid(rejectedCount);
+
         dashboardResponse.setTrashTotalDoc(
                 documentDetailRepository.countByIsDeletedTrue()
         );
@@ -147,40 +145,37 @@ public class DashboardServiceImpl implements DashboardService {
         // Branch-specific counts (if employee has branch)
         if (branchId != null) {
             log.debug("Processing branch-specific counts | branchId={}", branchId);
-            System.out.println("\n=== BRANCH-SPECIFIC COUNTS ===");
 
             // Branch user counts
             dashboardResponse.setBranchUser(employeeRepository.countByBranchId(branchId));
             dashboardResponse.setDepartmentCountForBranch(departmentMasterRepository.countByBranchId(branchId));
             dashboardResponse.setNullRoleEmployeeCountForBranch(employeeRepository.countByBranchIdAndRoleIsNull(branchId));
 
-            // Branch document counts
-            dashboardResponse.setTotalDocumentsById(documentDetailsService.countTotalDocByBranchId(branchId));
-            dashboardResponse.setTotalPendingDocumentsById(documentDetailsService.countPendingDocumentsByBranchId(branchId));
-            dashboardResponse.setTotalApprovedStatusDocById(documentDetailsService.countApprovedByBranchId(branchId));
-            dashboardResponse.setTotalRejectedStatusDocById(documentDetailsService.countRejectedByBranchId(branchId));
+            // ───────── HEADER-LEVEL (case-level) branch document counts ─────────
+            dashboardResponse.setTotalDocumentsById(documentHeaderService.countDocumentHeadersByBranchId(branchId));
+            dashboardResponse.setTotalPendingDocumentsById(documentHeaderService.countPendingDocumentsByBranchId(branchId));
+            dashboardResponse.setTotalApprovedStatusDocById(documentHeaderService.countApprovedByBranchId(branchId));
+            dashboardResponse.setTotalRejectedStatusDocById(documentHeaderService.countRejectedByBranchId(branchId));
         }
 
         // Department-specific counts (if employee has department)
         if (departmentId != null) {
             log.debug("Processing department-specific counts | departmentId={}", departmentId);
-            System.out.println("\n=== DEPARTMENT-SPECIFIC COUNTS ===");
 
             // Department user counts
             dashboardResponse.setDepartmentUser(employeeRepository.countByDepartmentId(departmentId));
             dashboardResponse.setNullRoleEmployeeCountForDepartment(employeeRepository.countByDepartmentIdAndRoleIsNull(departmentId));
 
-            // Department document counts
-            dashboardResponse.setTotalDocumentsByDepartmentId(documentDetailsService.countTotalDocByDepartmentId(departmentId));
-            dashboardResponse.setTotalPendingDocumentsByDepartmentId(documentDetailsService.countPendingDocumentsByDepartmentId(departmentId));
-            dashboardResponse.setTotalApprovedStatusDocByDepartmentId(documentDetailsService.countApprovedDetailsByDepartmentId(departmentId));
-            dashboardResponse.setTotalRejectedStatusDocByDepartmentId(documentDetailsService.countRejectedByDepartmentId(departmentId));
+            // ───────── HEADER-LEVEL (case-level) department document counts ─────────
+            dashboardResponse.setTotalDocumentsByDepartmentId(documentHeaderService.countDocumentHeadersByDepartmentId(departmentId));
+            dashboardResponse.setTotalPendingDocumentsByDepartmentId(documentHeaderService.countPendingDocumentsByDepartmentId(departmentId));
+            dashboardResponse.setTotalApprovedStatusDocByDepartmentId(documentHeaderService.countApprovedByDepartmentId(departmentId));
+            dashboardResponse.setTotalRejectedStatusDocByDepartmentId(documentHeaderService.countRejectedByDepartmentId(departmentId));
         }
 
         // For SYSTEM ADMIN (no branch/department)
         if (branchId == null && departmentId == null) {
             log.debug("Processing system admin counts");
-            System.out.println("\n=== SYSTEM ADMIN COUNTS ===");
 
             // Admin counts
             dashboardResponse.setBranchUser(employeeRepository.count());
@@ -188,7 +183,7 @@ public class DashboardServiceImpl implements DashboardService {
             dashboardResponse.setNullRoleEmployeeCountForBranch(employeeRepository.countByRoleIsNull());
             dashboardResponse.setNullRoleEmployeeCountForDepartment(employeeRepository.countByRoleIsNull());
 
-            // Admin document counts
+            // ───────── HEADER-LEVEL (case-level) admin document counts ─────────
             dashboardResponse.setTotalDocumentsById(documentHeaderRepository.count());
             dashboardResponse.setTotalDocumentsByDepartmentId(documentHeaderRepository.count());
             dashboardResponse.setTotalPendingDocumentsById(documentHeaderService.countPendingDocuments());

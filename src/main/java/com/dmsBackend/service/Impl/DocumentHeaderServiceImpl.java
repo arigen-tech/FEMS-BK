@@ -35,6 +35,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
 @Service
@@ -78,6 +80,24 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
     @Autowired
     DocumentMetadataRepository documentMetadataRepository;
 
+    @Autowired
+    private DocumentForwardingAuthorityRepository forwardingAuthorityRepository;
+
+    @Autowired
+    private ForwardingAuthorityTypeMasterRepository forwardingAuthorityTypeRepository;
+
+    @Autowired
+    private DistrictMasterRepository districtMasterRepository;
+
+    @Autowired
+    private CityMasterRepository cityMasterRepository;
+
+    @Autowired
+    private ModeOfSubmissionMasterRepository modeOfSubmissionRepository;
+
+    @Autowired
+    private PackageTypeMasterRepository packageTypeRepository;
+
     @Value("${document.storage.path}")
     private String documentStoragePath;
 
@@ -91,6 +111,8 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
 
     private final DocumentsAuditLogService documentsAuditLogService;
     private final DocHeaderStatusService docHeaderStatusService;
+    @Value("${forwarding.letter.storage.path:${document.storage.path}/forwarding-letters}")
+    private String forwardingLetterStoragePath;
 
     @Autowired
     private QRCodeGenerator qrCodeGenerator;
@@ -230,10 +252,14 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
             header.setCreatedBy(emp.getEmail());
             header.setUpdatedBy(emp.getEmail());
 
+            // NOTE: caseId is intentionally NOT set here — it's server-generated
+            // below, once the row has a real primary key to base it on.
+            header.setCaseId(null);
+
             log.info("Saving document header");
             DocumentHeader savedHeader = documentHeaderRepository.save(header);
 
-            // 5️⃣ Generate QR code
+            // 5️⃣ Generate QR code AND auto-generate Case ID
             try {
                 String qrCodePath = qrCodeGenerator.generateQRCodeForDocument(savedHeader);
                 savedHeader.setQrPath(qrCodePath);
@@ -243,12 +269,100 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                 savedHeader.setQrPath(null);
             }
 
+            String generatedCaseId = "CASE-" + java.time.Year.now().getValue()
+                    + "-" + String.format("%06d", savedHeader.getId());
+            savedHeader.setCaseId(generatedCaseId);
+            log.info("Auto-generated Case ID | documentId={} caseId={}", savedHeader.getId(), generatedCaseId);
+
             savedHeader = documentHeaderRepository.save(savedHeader);
 
             // 6️⃣ Save file details
             log.info("Saving file details for document {}", savedHeader.getId());
             documentDetailsService.saveFileDetailsWithWaitingRoom(
                     savedHeader, req.getFilePaths(), emp.getEmail());
+
+            // 6️⃣.1️⃣ Save Forwarding Authority Details (one row per document)
+            if (req.getForwardingAuthority() != null) {
+                DocumentSaveRequest.ForwardingAuthorityRequest fa = req.getForwardingAuthority();
+
+                DocumentForwardingAuthority forwardingAuthority = new DocumentForwardingAuthority();
+                forwardingAuthority.setDocumentHeader(savedHeader);
+
+                // Set ForwardingAuthorityType entity
+                if (fa.getForwardingAuthorityTypeId() != null) {
+                    ForwardingAuthorityTypeMaster authorityType = forwardingAuthorityTypeRepository
+                            .findById(fa.getForwardingAuthorityTypeId())
+                            .orElse(null);
+                    forwardingAuthority.setForwardingAuthorityType(authorityType);
+                }
+
+                forwardingAuthority.setAuthorityName(fa.getAuthorityName());
+                forwardingAuthority.setDesignation(fa.getDesignation());
+                forwardingAuthority.setOrganisation(fa.getOrganisation());
+
+                // Set District entity
+                if (fa.getDistrictId() != null) {
+                    DistrictMaster district = districtMasterRepository
+                            .findById(fa.getDistrictId())
+                            .orElse(null);
+                    forwardingAuthority.setDistrict(district);
+                }
+
+                // Set City entity
+                if (fa.getCityId() != null) {
+                    CityMaster city = cityMasterRepository
+                            .findById(fa.getCityId())
+                            .orElse(null);
+                    forwardingAuthority.setCity(city);
+                }
+
+                forwardingAuthority.setAddress(fa.getAddress());
+                forwardingAuthority.setContactNumber(fa.getContactNumber());
+                forwardingAuthority.setEmail(fa.getEmail());
+                forwardingAuthority.setForwardingLetterNumber(fa.getForwardingLetterNumber());
+                forwardingAuthority.setForwardingDate(fa.getForwardingDate());
+                forwardingAuthority.setForwardingLetterPath(fa.getForwardingLetterPath());
+
+                // Set ModeOfSubmission entity
+                if (fa.getModeOfSubmissionId() != null) {
+                    ModeOfSubmissionMaster modeOfSubmission = modeOfSubmissionRepository
+                            .findById(fa.getModeOfSubmissionId())
+                            .orElse(null);
+                    forwardingAuthority.setModeOfSubmission(modeOfSubmission);
+                }
+
+                forwardingAuthority.setCourierAgency(fa.getCourierAgency());
+                forwardingAuthority.setAwbConsignmentNumber(fa.getAwbConsignmentNumber());
+                forwardingAuthority.setBookingDate(fa.getBookingDate());
+                forwardingAuthority.setDispatchDate(fa.getDispatchDate());
+                forwardingAuthority.setExpectedDeliveryDate(fa.getExpectedDeliveryDate());
+                forwardingAuthority.setActualDeliveryDate(fa.getActualDeliveryDate());
+                forwardingAuthority.setParcelId(fa.getParcelId());
+                forwardingAuthority.setParcelNumber(fa.getParcelNumber());
+                forwardingAuthority.setNumberOfExhibits(fa.getNumberOfExhibits());
+
+                // Set PackageType entity
+                if (fa.getPackageTypeId() != null) {
+                    PackageTypeMaster packageType = packageTypeRepository
+                            .findById(fa.getPackageTypeId())
+                            .orElse(null);
+                    forwardingAuthority.setPackageType(packageType);
+                }
+
+                forwardingAuthority.setSealNumber(fa.getSealNumber());
+                forwardingAuthority.setSealDescription(fa.getSealDescription());
+                forwardingAuthority.setSealCondition(fa.getSealCondition());
+                forwardingAuthority.setPackageCondition(fa.getPackageCondition());
+                forwardingAuthority.setReceivedDate(fa.getReceivedDate());
+                forwardingAuthority.setReceivedTime(fa.getReceivedTime());
+                forwardingAuthority.setReceivedBy(fa.getReceivedBy());
+                forwardingAuthority.setRemarks(fa.getRemarks());
+                forwardingAuthority.setCreatedBy(emp.getEmail());
+                forwardingAuthority.setCreatedOn(now);
+
+                forwardingAuthorityRepository.save(forwardingAuthority);
+                log.info("Saved Forwarding Authority Details for document {}", savedHeader.getId());
+            }
 
             // 7️⃣ Recalculate header status
             docHeaderStatusService.recalcAndUpdateHeaderStatus(savedHeader, emp.getEmail());
@@ -294,6 +408,7 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                 Map<String, Object> detailsJson = new HashMap<>();
                 detailsJson.put("title", savedHeader.getTitle());
                 detailsJson.put("subject", savedHeader.getSubject());
+                detailsJson.put("caseId", savedHeader.getCaseId());
 
                 if (savedHeader.getCategoryMaster() != null) {
                     detailsJson.put("category", savedHeader.getCategoryMaster().getName());
@@ -337,8 +452,8 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
             api.setMessage("Document and files saved successfully");
             api.setResponse(data);
 
-            log.info("SUCCESS → Document Saved | id={} title={} fileCount={}",
-                    savedHeader.getId(), savedHeader.getTitle(), details.size());
+            log.info("SUCCESS → Document Saved | id={} caseId={} title={} fileCount={}",
+                    savedHeader.getId(), savedHeader.getCaseId(), savedHeader.getTitle(), details.size());
 
         } catch (Exception e) {
             log.error("FAILED → Save Document With Files | reason={}", e.getMessage(), e);
@@ -356,6 +471,415 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
         }
 
         return api;
+    }
+
+    @Transactional
+    @Override
+    public ApiResponse<MessageResponse> updateDocumentWithFiles(
+            DocumentHeader documentHeader,
+            List<DocumentSaveRequest.MetadataRequest> metadata,
+            List<Long> deletedMetaDataIds,
+            List<DocumentSaveRequest.FilePathVersion> filePaths,
+            DocumentSaveRequest.ForwardingAuthorityRequest forwardingAuthority,
+            String version,
+            HttpServletRequest request) {
+
+        log.info("API CALL → Update Document With Files | documentId={} version={}",
+                documentHeader.getId(), version);
+
+        MessageResponse msg = new MessageResponse();
+        Employee empObj = currentUser.getCurrentEmployeeOrThrow();
+        List<Integer> waitingRoomIdsToRollback = new ArrayList<>();
+
+        try {
+            // ✅ Extract waiting room IDs for rollback tracking
+            List<Integer> waitingRoomIdsInRequest = filePaths.stream()
+                    .filter(fp -> fp.getWaitingRoomId() != null)
+                    .map(fp -> fp.getWaitingRoomId())
+                    .collect(Collectors.toList());
+            waitingRoomIdsToRollback.addAll(waitingRoomIdsInRequest);
+
+            log.debug("Found {} waiting room files in update request", waitingRoomIdsInRequest.size());
+
+            // 1️⃣ Check for duplicate fileNo (excluding current doc)
+            Optional<DocumentHeader> duplicate = documentHeaderRepository.findByFileNo(documentHeader.getFileNo());
+            if (duplicate.isPresent() && !duplicate.get().getId().equals(documentHeader.getId())) {
+                log.warn("Duplicate fileNo found: {} for document {}", documentHeader.getFileNo(), documentHeader.getId());
+                msg.setMsg("Document with fileNo " + documentHeader.getFileNo() + " already exists");
+
+                auditLogUtil.logDocumentAction(
+                        empObj,
+                        "UploadDocument",
+                        "Update",
+                        "Failure",
+                        documentHeader.getId(),
+                        null,
+                        Map.of("reason", "Duplicate fileNo"),
+                        request
+                );
+
+                return ResponseUtils.createFailureResponse(
+                        msg,
+                        new TypeReference<>() {},
+                        "Duplicate fileNo: " + documentHeader.getFileNo(),
+                        HttpStatus.CONFLICT.value()
+                );
+            }
+
+            // 2️⃣ Load existing document
+            DocumentHeader existingDocument = documentHeaderRepository.findById(documentHeader.getId())
+                    .orElseThrow(() -> {
+                        log.error("Document not found for update | documentId={}", documentHeader.getId());
+                        return new ResourceNotFoundException("Document not found with id " + documentHeader.getId());
+                    });
+
+            // 3️⃣ MOVE WAITING ROOM FILES TO DOCUMENT STORAGE (for new waiting room files in update)
+            if (!waitingRoomIdsInRequest.isEmpty()) {
+                log.info("Moving {} waiting room files to document storage during update", waitingRoomIdsInRequest.size());
+                moveWaitingRoomFilesToDocumentStorage(filePaths, empObj, existingDocument.getCategoryMaster());
+            }
+
+            // 4️⃣ Capture previous data for audit
+            Map<String, Object> previousDocData = Map.of(
+                    "title", existingDocument.getTitle(),
+                    "subject", existingDocument.getSubject(),
+                    "category", existingDocument.getCategoryMaster().getName(),
+                    "year", (existingDocument.getDocumentDetails() != null && !existingDocument.getDocumentDetails().isEmpty())
+                            ? existingDocument.getDocumentDetails().get(0).getYearMaster().getName()
+                            : null
+            );
+
+            List<DocumentDetailsResponse> previousFileDetails = existingDocument.getDocumentDetails()
+                    .stream()
+                    .map(file -> {
+                        DocumentDetailsResponse resp = new DocumentDetailsResponse();
+                        resp.setId(file.getId());
+                        resp.setDocName(file.getDocName());
+                        resp.setVersion(file.getVersion());
+                        return resp;
+                    })
+                    .toList();
+
+            // 5️⃣ Detect changes
+            boolean categoryChanged = !existingDocument.getCategoryMaster().getId()
+                    .equals(documentHeader.getCategoryMaster().getId());
+
+            Long incomingYearId = (filePaths != null && !filePaths.isEmpty()) ? filePaths.get(0).getYearId() : null;
+            boolean yearChanged = incomingYearId != null &&
+                    existingDocument.getDocumentDetails() != null &&
+                    !existingDocument.getDocumentDetails().isEmpty() &&
+                    !existingDocument.getDocumentDetails().stream()
+                            .allMatch(d -> d.getYearMaster().getId().equals(incomingYearId));
+
+            log.debug("Update changes - categoryChanged: {}, yearChanged: {}", categoryChanged, yearChanged);
+
+            if (categoryChanged) {
+                CategoryMaster categoryMaster = categoryMasterRepository.findById(documentHeader.getCategoryMaster().getId())
+                        .orElseThrow(() -> new ResourceNotFoundException("CategoryMaster not found"));
+                existingDocument.setCategoryMaster(categoryMaster);
+            }
+
+            if (yearChanged && incomingYearId != null) {
+                YearMaster yearMaster = yearMasterRepository.findById(Math.toIntExact(incomingYearId))
+                        .orElseThrow(() -> new ResourceNotFoundException("YearMaster not found"));
+                for (DocumentDetails detail : existingDocument.getDocumentDetails()) {
+                    detail.setYearMaster(yearMaster);
+                }
+            }
+
+            // 6️⃣ Update header fields
+            existingDocument.setUpdatedOn(Timestamp.from(Instant.now()));
+            existingDocument.setFileNo(documentHeader.getFileNo());
+            existingDocument.setTitle(documentHeader.getTitle());
+            existingDocument.setSubject(documentHeader.getSubject());
+
+            // Case Information
+            existingDocument.setFirNumber(documentHeader.getFirNumber());
+            existingDocument.setFirDate(documentHeader.getFirDate());
+            existingDocument.setCaseTypeId(documentHeader.getCaseTypeId());
+            existingDocument.setCrimeTypeId(documentHeader.getCrimeTypeId());
+            existingDocument.setStateId(documentHeader.getStateId());
+            existingDocument.setDistrictId(documentHeader.getDistrictId());
+            existingDocument.setCityId(documentHeader.getCityId());
+            existingDocument.setPoliceStation(documentHeader.getPoliceStation());
+            existingDocument.setInvestigatingOfficer(documentHeader.getInvestigatingOfficer());
+            existingDocument.setCourtReference(documentHeader.getCourtReference());
+            existingDocument.setPriorityId(documentHeader.getPriorityId());
+            existingDocument.setDateOfIncident(documentHeader.getDateOfIncident());
+            existingDocument.setIncidentLocation(documentHeader.getIncidentLocation());
+
+            // Evidence Metadata
+            existingDocument.setEvidenceId(documentHeader.getEvidenceId());
+            existingDocument.setExhibitNumber(documentHeader.getExhibitNumber());
+            existingDocument.setEvidenceTypeId(documentHeader.getEvidenceTypeId());
+            existingDocument.setSource(documentHeader.getSource());
+            existingDocument.setCollectionLocation(documentHeader.getCollectionLocation());
+            existingDocument.setCollectionDate(documentHeader.getCollectionDate());
+            existingDocument.setEvidenceRemarks(documentHeader.getEvidenceRemarks());
+
+            // 7️⃣ Update files (including waiting room files)
+            List<DocumentDetails> updatedFiles = documentDetailsService.updateFileDetails(
+                    existingDocument.getCategoryMaster(),
+                    incomingYearId != null
+                            ? yearMasterRepository.findById(Math.toIntExact(incomingYearId)).orElse(null)
+                            : (existingDocument.getDocumentDetails() != null && !existingDocument.getDocumentDetails().isEmpty()
+                            ? existingDocument.getDocumentDetails().get(0).getYearMaster()
+                            : null),
+                    existingDocument,
+                    filePaths,
+                    version,
+                    categoryChanged || yearChanged
+            );
+
+            existingDocument.setDocumentDetails(updatedFiles);
+            existingDocument.setApprovalStatus(DocApprovalStatus.PENDING);
+
+            // 8️⃣ Save
+            DocumentHeader header = documentHeaderRepository.save(existingDocument);
+            msg.setMsg("Document updated successfully");
+
+            // 🔹 METADATA UPDATE LOGIC
+            if (metadata != null) {
+                log.debug("Processing {} metadata entries for update", metadata.size());
+
+                Map<Long, DocumentMetadata> existingMap =
+                        existingDocument.getMetadataList()
+                                .stream()
+                                .filter(m -> m.getId() != null)
+                                .collect(Collectors.toMap(DocumentMetadata::getId, m -> m));
+
+                List<DocumentMetadata> finalList = new ArrayList<>();
+
+                for (DocumentSaveRequest.MetadataRequest m : metadata) {
+                    if (m.getKey() == null || m.getKey().isBlank()) continue;
+
+                    if (m.getId() > 0 && existingMap.containsKey(m.getId())) {
+                        // ✅ UPDATE existing metadata
+                        DocumentMetadata meta = existingMap.get(m.getId());
+                        meta.setMetaKey(m.getKey().trim());
+                        meta.setMetaValue(m.getValue());
+                        finalList.add(meta);
+                    } else {
+                        // ✅ INSERT new metadata
+                        DocumentMetadata meta = new DocumentMetadata();
+                        meta.setDocumentHeader(existingDocument);
+                        meta.setMetaKey(m.getKey().trim());
+                        meta.setMetaValue(m.getValue());
+                        meta.setCreatedOn(new Timestamp(System.currentTimeMillis()));
+                        finalList.add(meta);
+                    }
+                }
+
+                existingDocument.getMetadataList().clear();
+                existingDocument.getMetadataList().addAll(finalList);
+            }
+
+            if (deletedMetaDataIds != null && !deletedMetaDataIds.isEmpty()) {
+                log.debug("Deleting {} metadata entries", deletedMetaDataIds.size());
+                documentMetadataRepository.deleteAllById(deletedMetaDataIds);
+            }
+
+            // 6️⃣.1️⃣ Update (or create, if it somehow never existed) Forwarding Authority Details
+            if (forwardingAuthority != null) {
+                DocumentForwardingAuthority faEntity = forwardingAuthorityRepository
+                        .findByDocumentHeader_Id(existingDocument.getId())
+                        .orElseGet(() -> {
+                            DocumentForwardingAuthority fresh = new DocumentForwardingAuthority();
+                            fresh.setDocumentHeader(existingDocument);
+                            fresh.setCreatedBy(empObj.getEmail());
+                            fresh.setCreatedOn(Timestamp.from(Instant.now()));
+                            return fresh;
+                        });
+
+                // Set ForwardingAuthorityType entity
+                if (forwardingAuthority.getForwardingAuthorityTypeId() != null) {
+                    ForwardingAuthorityTypeMaster authorityType = forwardingAuthorityTypeRepository
+                            .findById(forwardingAuthority.getForwardingAuthorityTypeId())
+                            .orElse(null);
+                    faEntity.setForwardingAuthorityType(authorityType);
+                }
+
+                faEntity.setAuthorityName(forwardingAuthority.getAuthorityName());
+                faEntity.setDesignation(forwardingAuthority.getDesignation());
+                faEntity.setOrganisation(forwardingAuthority.getOrganisation());
+
+                // Set District entity
+                if (forwardingAuthority.getDistrictId() != null) {
+                    DistrictMaster district = districtMasterRepository
+                            .findById(forwardingAuthority.getDistrictId())
+                            .orElse(null);
+                    faEntity.setDistrict(district);
+                }
+
+                // Set City entity
+                if (forwardingAuthority.getCityId() != null) {
+                    CityMaster city = cityMasterRepository
+                            .findById(forwardingAuthority.getCityId())
+                            .orElse(null);
+                    faEntity.setCity(city);
+                }
+
+                faEntity.setAddress(forwardingAuthority.getAddress());
+                faEntity.setContactNumber(forwardingAuthority.getContactNumber());
+                faEntity.setEmail(forwardingAuthority.getEmail());
+                faEntity.setForwardingLetterNumber(forwardingAuthority.getForwardingLetterNumber());
+                faEntity.setForwardingDate(forwardingAuthority.getForwardingDate());
+                faEntity.setForwardingLetterPath(forwardingAuthority.getForwardingLetterPath());
+
+                // Set ModeOfSubmission entity
+                if (forwardingAuthority.getModeOfSubmissionId() != null) {
+                    ModeOfSubmissionMaster modeOfSubmission = modeOfSubmissionRepository
+                            .findById(forwardingAuthority.getModeOfSubmissionId())
+                            .orElse(null);
+                    faEntity.setModeOfSubmission(modeOfSubmission);
+                }
+
+                faEntity.setCourierAgency(forwardingAuthority.getCourierAgency());
+                faEntity.setAwbConsignmentNumber(forwardingAuthority.getAwbConsignmentNumber());
+                faEntity.setBookingDate(forwardingAuthority.getBookingDate());
+                faEntity.setDispatchDate(forwardingAuthority.getDispatchDate());
+                faEntity.setExpectedDeliveryDate(forwardingAuthority.getExpectedDeliveryDate());
+                faEntity.setActualDeliveryDate(forwardingAuthority.getActualDeliveryDate());
+                faEntity.setParcelId(forwardingAuthority.getParcelId());
+                faEntity.setParcelNumber(forwardingAuthority.getParcelNumber());
+                faEntity.setNumberOfExhibits(forwardingAuthority.getNumberOfExhibits());
+
+                // Set PackageType entity
+                if (forwardingAuthority.getPackageTypeId() != null) {
+                    PackageTypeMaster packageType = packageTypeRepository
+                            .findById(forwardingAuthority.getPackageTypeId())
+                            .orElse(null);
+                    faEntity.setPackageType(packageType);
+                }
+
+                faEntity.setSealNumber(forwardingAuthority.getSealNumber());
+                faEntity.setSealDescription(forwardingAuthority.getSealDescription());
+                faEntity.setSealCondition(forwardingAuthority.getSealCondition());
+                faEntity.setPackageCondition(forwardingAuthority.getPackageCondition());
+                faEntity.setReceivedDate(forwardingAuthority.getReceivedDate());
+                faEntity.setReceivedTime(forwardingAuthority.getReceivedTime());
+                faEntity.setReceivedBy(forwardingAuthority.getReceivedBy());
+                faEntity.setRemarks(forwardingAuthority.getRemarks());
+                faEntity.setUpdatedBy(empObj.getEmail());
+                faEntity.setUpdatedOn(Timestamp.from(Instant.now()));
+
+                forwardingAuthorityRepository.save(faEntity);
+                log.debug("Updated Forwarding Authority Details for document {}", existingDocument.getId());
+            }
+
+            docHeaderStatusService.recalcAndUpdateHeaderStatus(header, empObj.getEmail());
+
+            // 9️⃣ Update waiting room status to MOVED for new waiting room files
+            if (!waitingRoomIdsInRequest.isEmpty()) {
+                waitingRoomScheduler.updateStatusToMoved(waitingRoomIdsInRequest);
+                log.info("Updated {} waiting room files to MOVED status during update", waitingRoomIdsInRequest.size());
+            }
+
+            // ✅ Clear rollback list on success
+            waitingRoomIdsToRollback.clear();
+
+            // 🔟 Success audit log
+            for (DocumentDetailsResponse prevFile : previousFileDetails) {
+                Map<String, Object> detailsJson = Map.of(
+                        "title", previousDocData.get("title"),
+                        "subject", previousDocData.get("subject"),
+                        "category", previousDocData.get("category"),
+                        "year", previousDocData.get("year"),
+                        "version", prevFile.getVersion(),
+                        "fileName", prevFile.getDocName()
+                );
+
+                auditLogUtil.logDocumentAction(
+                        empObj,
+                        "UploadDocument",
+                        "Update",
+                        "Success",
+                        existingDocument.getId(),
+                        List.of(prevFile),
+                        detailsJson,
+                        request
+                );
+            }
+
+            log.info("SUCCESS → Document Updated | id={} caseId={} title={}",
+                    existingDocument.getId(), existingDocument.getCaseId(), existingDocument.getTitle());
+
+            return ResponseUtils.createSuccessResponse(msg, new TypeReference<>() {});
+
+        } catch (Exception ex) {
+            log.error("FAILED → Update Document With Files | documentId={} reason={}",
+                    documentHeader.getId(), ex.getMessage(), ex);
+
+            msg.setMsg("Document update failed");
+
+            // ❌ Rollback: Update waiting room status to FAILED
+            if (!waitingRoomIdsToRollback.isEmpty()) {
+                log.info("🔄 Rolling back {} waiting room files due to update failure", waitingRoomIdsToRollback.size());
+                waitingRoomScheduler.updateStatusToFailed(waitingRoomIdsToRollback);
+            }
+
+            auditLogUtil.logDocumentAction(
+                    empObj,
+                    "UploadDocument",
+                    "Update",
+                    "Failure",
+                    documentHeader.getId(),
+                    null,
+                    Map.of("error", ex.getMessage()),
+                    request
+            );
+
+            return ResponseUtils.createFailureResponse(
+                    msg,
+                    new TypeReference<>() {},
+                    ex.getMessage(),
+                    HttpStatus.CONFLICT.value()
+            );
+        }
+    }
+
+
+    @Override
+    public String saveForwardingLetterFile(MultipartFile file, Integer documentId) {
+        if (file == null || file.isEmpty()) {
+            return null;
+        }
+
+        try {
+            Path uploadDir;
+            if (documentId != null) {
+                uploadDir = Paths.get(forwardingLetterStoragePath, String.valueOf(documentId));
+            } else {
+                uploadDir = Paths.get(forwardingLetterStoragePath);
+            }
+            Files.createDirectories(uploadDir);
+
+            String originalFilename = StringUtils.cleanPath(file.getOriginalFilename());
+            String fileExtension = originalFilename.substring(originalFilename.lastIndexOf("."));
+            String newFilename = "forwarding-letter-" + System.currentTimeMillis() + fileExtension;
+
+            Path filePath = uploadDir.resolve(newFilename);
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+            if (documentId != null) {
+                return Paths.get(String.valueOf(documentId), newFilename).toString();
+            }
+            return newFilename;
+        } catch (IOException e) {
+            log.error("Failed to save forwarding letter file", e);
+            return null;
+        }
+    }
+
+    @Override
+    @Transactional
+    public void updateForwardingLetterPath(Integer documentId, String filePath) {
+        forwardingAuthorityRepository.findByDocumentHeader_Id(documentId)
+                .ifPresent(fa -> {
+                    fa.setForwardingLetterPath(filePath);
+                    fa.setUpdatedOn(Timestamp.from(Instant.now()));
+                    forwardingAuthorityRepository.save(fa);
+                });
     }
 
     private void moveWaitingRoomFilesToDocumentStorage(List<DocumentSaveRequest.FilePathVersion> filePaths,
@@ -529,257 +1053,7 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
         }
     }
 
-    @Transactional
-    @Override
-    public ApiResponse<MessageResponse> updateDocumentWithFiles(
-            DocumentHeader documentHeader,
-            List<DocumentSaveRequest.MetadataRequest> metadata,
-            List<Long> deletedMetaDataIds,
-            List<DocumentSaveRequest.FilePathVersion> filePaths,
-            String version,
-            HttpServletRequest request) {
 
-        log.info("API CALL → Update Document With Files | documentId={} version={}",
-                documentHeader.getId(), version);
-
-        MessageResponse msg = new MessageResponse();
-        Employee empObj = currentUser.getCurrentEmployeeOrThrow();
-        List<Integer> waitingRoomIdsToRollback = new ArrayList<>();
-
-        try {
-            // ✅ Extract waiting room IDs for rollback tracking
-            List<Integer> waitingRoomIdsInRequest = filePaths.stream()
-                    .filter(fp -> fp.getWaitingRoomId() != null)
-                    .map(fp -> fp.getWaitingRoomId())
-                    .collect(Collectors.toList());
-            waitingRoomIdsToRollback.addAll(waitingRoomIdsInRequest);
-
-            log.debug("Found {} waiting room files in update request", waitingRoomIdsInRequest.size());
-
-            // 1️⃣ Check for duplicate fileNo (excluding current doc)
-            Optional<DocumentHeader> duplicate = documentHeaderRepository.findByFileNo(documentHeader.getFileNo());
-            if (duplicate.isPresent() && !duplicate.get().getId().equals(documentHeader.getId())) {
-                log.warn("Duplicate fileNo found: {} for document {}", documentHeader.getFileNo(), documentHeader.getId());
-                msg.setMsg("Document with fileNo " + documentHeader.getFileNo() + " already exists");
-
-                auditLogUtil.logDocumentAction(
-                        empObj,
-                        "UploadDocument",
-                        "Update",
-                        "Failure",
-                        documentHeader.getId(),
-                        null,
-                        Map.of("reason", "Duplicate fileNo"),
-                        request
-                );
-
-                return ResponseUtils.createFailureResponse(
-                        msg,
-                        new TypeReference<>() {},
-                        "Duplicate fileNo: " + documentHeader.getFileNo(),
-                        HttpStatus.CONFLICT.value()
-                );
-            }
-
-            // 2️⃣ Load existing document
-            DocumentHeader existingDocument = documentHeaderRepository.findById(documentHeader.getId())
-                    .orElseThrow(() -> {
-                        log.error("Document not found for update | documentId={}", documentHeader.getId());
-                        return new ResourceNotFoundException("Document not found with id " + documentHeader.getId());
-                    });
-
-            // 3️⃣ MOVE WAITING ROOM FILES TO DOCUMENT STORAGE (for new waiting room files in update)
-            if (!waitingRoomIdsInRequest.isEmpty()) {
-                log.info("Moving {} waiting room files to document storage during update", waitingRoomIdsInRequest.size());
-                moveWaitingRoomFilesToDocumentStorage(filePaths, empObj, existingDocument.getCategoryMaster());
-            }
-
-            // 4️⃣ Capture previous data for audit
-            Map<String, Object> previousDocData = Map.of(
-                    "title", existingDocument.getTitle(),
-                    "subject", existingDocument.getSubject(),
-                    "category", existingDocument.getCategoryMaster().getName(),
-                    "year", (existingDocument.getDocumentDetails() != null && !existingDocument.getDocumentDetails().isEmpty())
-                            ? existingDocument.getDocumentDetails().get(0).getYearMaster().getName()
-                            : null
-            );
-
-            List<DocumentDetailsResponse> previousFileDetails = existingDocument.getDocumentDetails()
-                    .stream()
-                    .map(file -> {
-                        DocumentDetailsResponse resp = new DocumentDetailsResponse();
-                        resp.setId(file.getId());
-                        resp.setDocName(file.getDocName());
-                        resp.setVersion(file.getVersion());
-                        return resp;
-                    })
-                    .toList();
-
-            // 5️⃣ Detect changes
-            boolean categoryChanged = !existingDocument.getCategoryMaster().getId()
-                    .equals(documentHeader.getCategoryMaster().getId());
-
-            Long incomingYearId = (filePaths != null && !filePaths.isEmpty()) ? filePaths.get(0).getYearId() : null;
-            boolean yearChanged = incomingYearId != null &&
-                    existingDocument.getDocumentDetails() != null &&
-                    !existingDocument.getDocumentDetails().isEmpty() &&
-                    !existingDocument.getDocumentDetails().stream()
-                            .allMatch(d -> d.getYearMaster().getId().equals(incomingYearId));
-
-            log.debug("Update changes - categoryChanged: {}, yearChanged: {}", categoryChanged, yearChanged);
-
-            if (categoryChanged) {
-                CategoryMaster categoryMaster = categoryMasterRepository.findById(documentHeader.getCategoryMaster().getId())
-                        .orElseThrow(() -> new ResourceNotFoundException("CategoryMaster not found"));
-                existingDocument.setCategoryMaster(categoryMaster);
-            }
-
-            if (yearChanged && incomingYearId != null) {
-                YearMaster yearMaster = yearMasterRepository.findById(Math.toIntExact(incomingYearId))
-                        .orElseThrow(() -> new ResourceNotFoundException("YearMaster not found"));
-                for (DocumentDetails detail : existingDocument.getDocumentDetails()) {
-                    detail.setYearMaster(yearMaster);
-                }
-            }
-
-            // 6️⃣ Update header fields
-            existingDocument.setUpdatedOn(Timestamp.from(Instant.now()));
-            existingDocument.setFileNo(documentHeader.getFileNo());
-            existingDocument.setTitle(documentHeader.getTitle());
-            existingDocument.setSubject(documentHeader.getSubject());
-
-            // 7️⃣ Update files (including waiting room files)
-            List<DocumentDetails> updatedFiles = documentDetailsService.updateFileDetails(
-                    existingDocument.getCategoryMaster(),
-                    incomingYearId != null
-                            ? yearMasterRepository.findById(Math.toIntExact(incomingYearId)).orElse(null)
-                            : (existingDocument.getDocumentDetails() != null && !existingDocument.getDocumentDetails().isEmpty()
-                            ? existingDocument.getDocumentDetails().get(0).getYearMaster()
-                            : null),
-                    existingDocument,
-                    filePaths,
-                    version,
-                    categoryChanged || yearChanged
-            );
-
-            existingDocument.setDocumentDetails(updatedFiles);
-            existingDocument.setApprovalStatus(DocApprovalStatus.PENDING);
-
-            // 8️⃣ Save
-            DocumentHeader header = documentHeaderRepository.save(existingDocument);
-            msg.setMsg("Document updated successfully");
-
-            // 🔹 METADATA UPDATE LOGIC
-            if (metadata != null) {
-                log.debug("Processing {} metadata entries for update", metadata.size());
-
-                Map<Long, DocumentMetadata> existingMap =
-                        existingDocument.getMetadataList()
-                                .stream()
-                                .filter(m -> m.getId() != null)
-                                .collect(Collectors.toMap(DocumentMetadata::getId, m -> m));
-
-                List<DocumentMetadata> finalList = new ArrayList<>();
-
-                for (DocumentSaveRequest.MetadataRequest m : metadata) {
-
-                    if (m.getKey() == null || m.getKey().isBlank()) continue;
-
-                    if (m.getId() > 0 && existingMap.containsKey(m.getId())) {
-                        // ✅ UPDATE existing metadata
-                        DocumentMetadata meta = existingMap.get(m.getId());
-                        meta.setMetaKey(m.getKey().trim());
-                        meta.setMetaValue(m.getValue());
-                        finalList.add(meta);
-                    } else {
-                        // ✅ INSERT new metadata
-                        DocumentMetadata meta = new DocumentMetadata();
-                        meta.setDocumentHeader(existingDocument);
-                        meta.setMetaKey(m.getKey().trim());
-                        meta.setMetaValue(m.getValue());
-                        meta.setCreatedOn(new Timestamp(System.currentTimeMillis()));
-                        finalList.add(meta);
-                    }
-                }
-
-                existingDocument.getMetadataList().clear();
-                existingDocument.getMetadataList().addAll(finalList);
-            }
-
-            if (deletedMetaDataIds != null && !deletedMetaDataIds.isEmpty()) {
-                log.debug("Deleting {} metadata entries", deletedMetaDataIds.size());
-                documentMetadataRepository.deleteAllById(deletedMetaDataIds);
-            }
-
-            docHeaderStatusService.recalcAndUpdateHeaderStatus(header, empObj.getEmail());
-
-            // 9️⃣ Update waiting room status to MOVED for new waiting room files
-            if (!waitingRoomIdsInRequest.isEmpty()) {
-                waitingRoomScheduler.updateStatusToMoved(waitingRoomIdsInRequest);
-                log.info("Updated {} waiting room files to MOVED status during update", waitingRoomIdsInRequest.size());
-            }
-
-            // ✅ Clear rollback list on success
-            waitingRoomIdsToRollback.clear();
-
-            // 🔟 Success audit log
-            for (DocumentDetailsResponse prevFile : previousFileDetails) {
-                Map<String, Object> detailsJson = Map.of(
-                        "title", previousDocData.get("title"),
-                        "subject", previousDocData.get("subject"),
-                        "category", previousDocData.get("category"),
-                        "year", previousDocData.get("year"),
-                        "version", prevFile.getVersion(),
-                        "fileName", prevFile.getDocName()
-                );
-
-                auditLogUtil.logDocumentAction(
-                        empObj,
-                        "UploadDocument",
-                        "Update",
-                        "Success",
-                        existingDocument.getId(),
-                        List.of(prevFile),
-                        detailsJson,
-                        request
-                );
-            }
-
-            log.info("SUCCESS → Document Updated | id={} title={}", existingDocument.getId(), existingDocument.getTitle());
-
-            return ResponseUtils.createSuccessResponse(msg, new TypeReference<>() {});
-
-        } catch (Exception ex) {
-            log.error("FAILED → Update Document With Files | documentId={} reason={}",
-                    documentHeader.getId(), ex.getMessage(), ex);
-
-            msg.setMsg("Document update failed");
-
-            // ❌ Rollback: Update waiting room status to FAILED
-            if (!waitingRoomIdsToRollback.isEmpty()) {
-                log.info("🔄 Rolling back {} waiting room files due to update failure", waitingRoomIdsToRollback.size());
-                waitingRoomScheduler.updateStatusToFailed(waitingRoomIdsToRollback);
-            }
-
-            auditLogUtil.logDocumentAction(
-                    empObj,
-                    "UploadDocument",
-                    "Update",
-                    "Failure",
-                    documentHeader.getId(),
-                    null,
-                    Map.of("error", ex.getMessage()),
-                    request
-            );
-
-            return ResponseUtils.createFailureResponse(
-                    msg,
-                    new TypeReference<>() {},
-                    ex.getMessage(),
-                    HttpStatus.CONFLICT.value()
-            );
-        }
-    }
 
     //Update Document Active Status (Soft Delete)
     @Override
@@ -797,36 +1071,52 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
     }
 
     //Update Document Approval Status (Pending, Reject, Approve)
+    //Update Document Approval Status (Pending, Reject, Approve) — HEADER LEVEL
     @Override
+    @Transactional
     public DocumentHeader updateApprovalStatus(Integer id, DocApprovalStatus status, String rejectionReason, Integer employeeId) {
         log.info("API CALL → Update Document Approval Status | id={} status={} employeeId={}",
                 id, status, employeeId);
 
         DocumentHeader documentHeader = findDocumentHeaderById(id);
 
-        documentHeader.setApprovalStatus(status);
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> {
+                    log.error("Employee not found | employeeId={}", employeeId);
+                    return new ResourceNotFoundException("Employee not found");
+                });
 
-        if (status != null) {
-            Employee employee = employeeRepository.findById(employeeId)
-                    .orElseThrow(() -> {
-                        log.error("Employee not found | employeeId={}", employeeId);
-                        return new ResourceNotFoundException("Employee not found");
-                    });
+        docHeaderStatusService.applyHeaderDecision(documentHeader, status, rejectionReason, employee.getEmail());
 
-            documentHeader.setEmployee(employee);
-        }
-
-        // Save the updated document header
         DocumentHeader updatedDocumentHeader = documentHeaderRepository.save(documentHeader);
 
-        // Create a notification
-//        notificationService.createDocumentNotification(updatedDocumentHeader);
+        try {
+            notificationService.createNewDocumentSavedNotification(updatedDocumentHeader);
+        } catch (Exception ex) {
+            log.warn("Notification failed for header {}", id, ex);
+        }
+
+        Map<String, Object> detailsJson = new HashMap<>();
+        detailsJson.put("newStatus", status.name());
+        detailsJson.put("reason", rejectionReason == null ? "" : rejectionReason);
+        detailsJson.put("title", updatedDocumentHeader.getTitle());
+        detailsJson.put("caseId", updatedDocumentHeader.getCaseId() == null ? "" : updatedDocumentHeader.getCaseId());
+
+        auditLogUtil.logDocumentAction(
+                employee,
+                "Document",
+                "StatusChange",
+                "Success",
+                id,
+                null,
+                detailsJson,
+                null
+        );
 
         log.info("SUCCESS → Document Approval Status Updated | id={} status={}", id, status);
 
         return updatedDocumentHeader;
     }
-
     //Delete Document
     @Override
     public void deleteByIdDocumentHeader(Integer id) {
@@ -914,54 +1204,7 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
     }
 
     //Find All Approved Document
-    @Override
-    public List<DocumentHeader> getAllApproved() {
-        log.info("API CALL → Get All Approved Documents");
 
-        List<DocumentHeader> documents = documentHeaderRepository.findAllByApprovalStatusesOrdered(List.of(
-                DocApprovalStatus.APPROVED.name(),
-                DocApprovalStatus.PARTIALLY_APPROVED.name()
-        ));
-
-        log.info("SUCCESS → Retrieved {} approved documents", documents.size());
-
-        return documents;
-    }
-
-    //Find All Reject Document
-    @Override
-    public List<DocumentHeader> getAllRejected() {
-        log.info("API CALL → Get All Rejected Documents");
-
-        List<DocumentHeader> documents = documentHeaderRepository.findAllByApprovalStatusesOrdered(List.of(
-                DocApprovalStatus.REJECTED.name(),
-                DocApprovalStatus.PARTIALLY_REJECT.name()
-        ));
-
-        log.info("SUCCESS → Retrieved {} rejected documents", documents.size());
-
-        return documents;
-    }
-
-    //Find All Pending Document
-    @Override
-    public List<DocumentHeader> getAllPending() {
-        log.info("API CALL → Get All Pending Documents");
-
-        try {
-            List<DocumentHeader> documents = documentHeaderRepository.findAllByApprovalStatusesOrdered(List.of(
-                    DocApprovalStatus.PENDING.name(),
-                    DocApprovalStatus.PARTIALLY_PENDING.name()
-            ));
-
-            log.info("SUCCESS → Retrieved {} pending documents", documents.size());
-
-            return documents;
-        } catch (Exception e) {
-            log.error("FAILED → Get All Pending Documents | reason={}", e.getMessage(), e);
-            throw new RuntimeException("Failed to fetch pending documents", e);
-        }
-    }
 
     //========================================== USER ==========================================
 
@@ -977,100 +1220,29 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
         return documents;
     }
 
-    //Find All Approved Document For User
+
+
     @Override
     public List<DocumentHeader> getAllApprovedByEmployeeId(Integer employeeId) {
         log.info("API CALL → Get Approved Documents By Employee | employeeId={}", employeeId);
-
-        List<DocumentHeader> headers =
-                documentHeaderRepository.findAllApprovedByEmployeeId(employeeId);
-
-        headers.forEach(header -> {
-            if (header.getDocumentDetails() != null) {
-
-                // 1️⃣ Keep ONLY APPROVED details
-                List<DocumentDetails> approvedOnly = header.getDocumentDetails()
-                        .stream()
-                        .filter(d ->
-                                d.getStatus() == DocApprovalStatus.APPROVED &&
-                                        Boolean.FALSE.equals(d.getIsDeleted())
-                        )
-                        .collect(Collectors.toList());
-
-                // 2️⃣ Group by version (your existing logic)
-                List<DocumentDetails> rearranged = approvedOnly.stream()
-                        .collect(Collectors.groupingBy(
-                                DocumentDetails::getVersion,
-                                LinkedHashMap::new,
-                                Collectors.toList()
-                        ))
-                        .values()
-                        .stream()
-                        .flatMap(List::stream)
-                        .collect(Collectors.toList());
-
-                header.setDocumentDetails(rearranged);
-            }
-        });
-
+        List<DocumentHeader> headers = documentHeaderRepository.findAllApprovedByEmployeeId(employeeId);
         log.info("SUCCESS → Retrieved {} approved documents for employee ID: {}", headers.size(), employeeId);
-
         return headers;
     }
 
-    //Find All Reject Document For User
     @Override
     public List<DocumentHeader> getAllRejectedByEmployeeId(Integer employeeId) {
         log.info("API CALL → Get Rejected Documents By Employee | employeeId={}", employeeId);
-
-        List<DocumentHeader> headers =
-                documentHeaderRepository.findAllRejectedByEmployeeId(employeeId);
-
-        headers.forEach(header -> {
-            if (header.getDocumentDetails() != null) {
-
-                List<DocumentDetails> rejectedOnly = header.getDocumentDetails()
-                        .stream()
-                        .filter(d ->
-                                d.getStatus() == DocApprovalStatus.REJECTED &&
-                                        Boolean.FALSE.equals(d.getIsDeleted())
-                        )
-                        .collect(Collectors.toList());
-
-                header.setDocumentDetails(rejectedOnly);
-            }
-        });
-
+        List<DocumentHeader> headers = documentHeaderRepository.findAllRejectedByEmployeeId(employeeId);
         log.info("SUCCESS → Retrieved {} rejected documents for employee ID: {}", headers.size(), employeeId);
-
         return headers;
     }
 
-    //Find All Pending Document For User
     @Override
     public List<DocumentHeader> getAllPendingByEmployeeId(Integer employeeId) {
         log.info("API CALL → Get Pending Documents By Employee | employeeId={}", employeeId);
-
-        List<DocumentHeader> headers =
-                documentHeaderRepository.findAllPendingByEmployeeId(employeeId);
-
-        headers.forEach(header -> {
-            if (header.getDocumentDetails() != null) {
-
-                List<DocumentDetails> pendingOnly = header.getDocumentDetails()
-                        .stream()
-                        .filter(d ->
-                                d.getStatus() == DocApprovalStatus.PENDING &&
-                                        Boolean.FALSE.equals(d.getIsDeleted())
-                        )
-                        .collect(Collectors.toList());
-
-                header.setDocumentDetails(pendingOnly);
-            }
-        });
-
+        List<DocumentHeader> headers = documentHeaderRepository.findAllPendingByEmployeeId(employeeId);
         log.info("SUCCESS → Retrieved {} pending documents for employee ID: {}", headers.size(), employeeId);
-
         return headers;
     }
 
@@ -1087,52 +1259,28 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                 });
 
         String role = employee.getRole().getRole();
-
         List<DocumentHeader> headers;
 
-        if ("ADMIN".equalsIgnoreCase(role)) {
-            log.debug("Admin role - fetching all rejected documents");
+        if ("SYSTEM ADMIN".equalsIgnoreCase(role)) {
+            log.debug("System Admin role - fetching all rejected documents");
             headers = documentHeaderRepository.findAllRejectedForAdmin();
 
-        } else if ("BRANCH ADMIN".equalsIgnoreCase(role)) {
-            log.debug("Branch Admin role - fetching rejected documents for branch: {}", employee.getBranch().getId());
-            headers = documentHeaderRepository.findAllRejectedByBranch(
-                    employee.getBranch().getId()
-            );
+        } else if ("LABORATORY ADMIN / HOD".equalsIgnoreCase(role)) {
+            log.debug("Lab Admin/Director role - fetching rejected documents for branch: {}", employee.getBranch().getId());
+            headers = documentHeaderRepository.findAllRejectedByBranch(employee.getBranch().getId());
 
-        } else if ("DEPARTMENT ADMIN".equalsIgnoreCase(role)) {
-            log.debug("Department Admin role - fetching rejected documents for department: {}", employee.getDepartment().getId());
-            headers = documentHeaderRepository.findAllRejectedByDepartment(
-                    employee.getDepartment().getId()
-            );
+        } else if ("SCIENTIFIC OFFICER".equalsIgnoreCase(role) || "CASE & EVIDENCE OFFICER".equalsIgnoreCase(role)) {
+            log.debug("Officer role - fetching rejected documents for department: {}", employee.getDepartment().getId());
+            headers = documentHeaderRepository.findAllRejectedByDepartment(employee.getDepartment().getId());
 
         } else {
             log.error("Unauthorized role for fetching rejected documents | role={}", role);
             throw new IllegalArgumentException("Unauthorized role for fetching rejected documents.");
         }
 
-    /* -------------------------------
-       SAFETY FILTER (MANDATORY)
-       ------------------------------- */
-        headers.forEach(header -> {
-            if (header.getDocumentDetails() != null) {
-                List<DocumentDetails> rejectedOnly =
-                        header.getDocumentDetails().stream()
-                                .filter(d ->
-                                        d.getStatus() == DocApprovalStatus.REJECTED &&
-                                                Boolean.FALSE.equals(d.getIsDeleted())
-                                )
-                                .toList();
-
-                header.setDocumentDetails(rejectedOnly);
-            }
-        });
-
         log.info("SUCCESS → Retrieved {} rejected documents by action employee", headers.size());
-
         return headers;
     }
-
     @Override
     public List<DocumentHeader> findAllApprovedByActionEmployeeId(Integer employeeId) {
         log.info("API CALL → Find Approved Documents By Action Employee | employeeId={}", employeeId);
@@ -1145,27 +1293,22 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
 
         String role = employee.getRole().getRole();
 
-        if ("ADMIN".equalsIgnoreCase(role)) {
-            log.debug("Admin role - fetching all approved documents");
+        if ("SYSTEM ADMIN".equalsIgnoreCase(role)) {
+            log.debug("System Admin role - fetching all approved documents");
             return documentHeaderRepository.findApprovedHeadersForAdmin();
 
-        } else if ("BRANCH ADMIN".equalsIgnoreCase(role)) {
-            log.debug("Branch Admin role - fetching approved documents for branch: {}", employee.getBranch().getId());
-            return documentHeaderRepository.findApprovedHeadersByBranch(
-                    employee.getBranch()
-            );
+        } else if ("LABORATORY ADMIN / HOD".equalsIgnoreCase(role)) {
+            log.debug("Lab Admin/Director role - fetching approved documents for branch: {}", employee.getBranch().getId());
+            return documentHeaderRepository.findApprovedHeadersByBranch(employee.getBranch());
 
-        } else if ("DEPARTMENT ADMIN".equalsIgnoreCase(role)) {
-            log.debug("Department Admin role - fetching approved documents for department: {}", employee.getDepartment().getId());
-            return documentHeaderRepository.findApprovedHeadersByDepartment(
-                    employee.getDepartment()
-            );
+        } else if ("SCIENTIFIC OFFICER".equalsIgnoreCase(role) || "CASE & EVIDENCE OFFICER".equalsIgnoreCase(role)) {
+            log.debug("Officer role - fetching approved documents for department: {}", employee.getDepartment().getId());
+            return documentHeaderRepository.findApprovedHeadersByDepartment(employee.getDepartment());
         }
 
         log.error("Unauthorized role for fetching approved documents | role={}", role);
         throw new IllegalArgumentException("Unauthorized role for fetching approved documents.");
     }
-
     @Override
     public List<DocumentHeader> findAllTrashApprovedByEmployeeId(Integer employeeId) {
         log.info("API CALL → Find Trash Approved Documents By Employee | employeeId={}", employeeId);
@@ -1178,64 +1321,87 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
 
         String role = employee.getRole().getRole();
 
-        if ("ADMIN".equalsIgnoreCase(role)) {
-            log.debug("Admin role - fetching all trash documents");
+        if ("SYSTEM ADMIN".equalsIgnoreCase(role)) {
+            log.debug("System Admin role - fetching all trash documents");
             return documentHeaderRepository.findDeletedDetailsForAdmin();
 
-        } else if ("BRANCH ADMIN".equalsIgnoreCase(role)) {
-            log.debug("Branch Admin role - fetching trash documents for branch: {}", employee.getBranch().getId());
-            return documentHeaderRepository.findDeletedDetailsByBranch(
-                    employee.getBranch()
-            );
+        } else if ("LABORATORY ADMIN / HOD".equalsIgnoreCase(role)) {
+            log.debug("Lab Admin/Director role - fetching trash documents for branch: {}", employee.getBranch().getId());
+            return documentHeaderRepository.findDeletedDetailsByBranch(employee.getBranch());
 
-        } else if ("DEPARTMENT ADMIN".equalsIgnoreCase(role)) {
-            log.debug("Department Admin role - fetching trash documents for department: {}", employee.getDepartment().getId());
-            return documentHeaderRepository.findDeletedDetailsByDepartment(
-                    employee.getDepartment()
-            );
+        } else if ("SCIENTIFIC OFFICER".equalsIgnoreCase(role) || "CASE & EVIDENCE OFFICER".equalsIgnoreCase(role)) {
+            log.debug("Officer role - fetching trash documents for department: {}", employee.getDepartment().getId());
+            return documentHeaderRepository.findDeletedDetailsByDepartment(employee.getDepartment());
         }
 
         log.error("Unauthorized role for fetching trash documents | role={}", role);
         throw new IllegalArgumentException("Unauthorized role for fetching trash documents.");
     }
-
     // ========================================================= Document Count Operations ========================================================= //
 
     //Count All Approved Document
     @Override
     public long countApprovedDocuments() {
         log.info("API CALL → Count All Approved Documents");
-
-        long count = documentHeaderRepository.countByApprovalStatusIn(List.of(DocApprovalStatus.APPROVED,DocApprovalStatus.PARTIALLY_APPROVED));
-
+        long count = documentHeaderRepository.countByApprovalStatusIn(List.of(DocApprovalStatus.APPROVED));
         log.info("SUCCESS → Counted {} approved documents", count);
-
         return count;
     }
 
-    //Count All Reject Document
     @Override
     public long countRejectedDocuments() {
         log.info("API CALL → Count All Rejected Documents");
-
-        long count = documentHeaderRepository.countByApprovalStatusIn(List.of(DocApprovalStatus.REJECTED,DocApprovalStatus.PARTIALLY_REJECT));
-
+        long count = documentHeaderRepository.countByApprovalStatusIn(List.of(DocApprovalStatus.REJECTED));
         log.info("SUCCESS → Counted {} rejected documents", count);
-
         return count;
     }
 
-    //Count All Pending Document
     @Override
     public long countPendingDocuments() {
         log.info("API CALL → Count All Pending Documents");
-
-        long count = documentHeaderRepository.countByApprovalStatusIn(List.of(DocApprovalStatus.PENDING,DocApprovalStatus.PARTIALLY_PENDING));
-
+        long count = documentHeaderRepository.countByApprovalStatusIn(List.of(DocApprovalStatus.PENDING));
         log.info("SUCCESS → Counted {} pending documents", count);
-
         return count;
     }
+
+
+
+
+
+    @Override
+    public List<DocumentHeader> getAllApproved() {
+        log.info("API CALL → Get All Approved Documents");
+        List<DocumentHeader> documents = documentHeaderRepository.findAllByApprovalStatusesOrdered(
+                List.of(DocApprovalStatus.APPROVED.name()));
+        log.info("SUCCESS → Retrieved {} approved documents", documents.size());
+        return documents;
+    }
+
+    @Override
+    public List<DocumentHeader> getAllRejected() {
+        log.info("API CALL → Get All Rejected Documents");
+        List<DocumentHeader> documents = documentHeaderRepository.findAllByApprovalStatusesOrdered(
+                List.of(DocApprovalStatus.REJECTED.name()));
+        log.info("SUCCESS → Retrieved {} rejected documents", documents.size());
+        return documents;
+    }
+
+    @Override
+    public List<DocumentHeader> getAllPending() {
+        log.info("API CALL → Get All Pending Documents");
+        try {
+            List<DocumentHeader> documents = documentHeaderRepository.findAllByApprovalStatusesOrdered(
+                    List.of(DocApprovalStatus.PENDING.name()));
+            log.info("SUCCESS → Retrieved {} pending documents", documents.size());
+            return documents;
+        } catch (Exception e) {
+            log.error("FAILED → Get All Pending Documents | reason={}", e.getMessage(), e);
+            throw new RuntimeException("Failed to fetch pending documents", e);
+        }
+    }
+
+    //Count All Reject Document
+
 
     //========================================== USER ==========================================
 
@@ -1367,17 +1533,26 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
     @Override
     public List<DocumentHeader> getPendingDocumentsByBranch(Integer branchId) {
         log.info("API CALL → Get Pending Documents By Branch | branchId={}", branchId);
-
-        List<DocumentHeader> headers =
-                documentHeaderRepository.findPendingByBranch(branchId);
-
-        filterPendingDetails(headers);
-
+        List<DocumentHeader> headers = documentHeaderRepository.findPendingByBranch(branchId);
         log.info("SUCCESS → Retrieved {} pending documents for branch ID: {}", headers.size(), branchId);
-
         return headers;
     }
 
+    @Override
+    public List<DocumentHeader> getPendingDocumentsByDepartment(Integer departmentId) {
+        log.info("API CALL → Get Pending Documents By Department | departmentId={}", departmentId);
+        List<DocumentHeader> headers = documentHeaderRepository.findPendingByDepartment(departmentId);
+        log.info("SUCCESS → Retrieved {} pending documents for department ID: {}", headers.size(), departmentId);
+        return headers;
+    }
+
+    @Override
+    public List<DocumentHeader> getAllPendingDocuments() {
+        log.info("API CALL → Get All Pending Documents");
+        List<DocumentHeader> headers = documentHeaderRepository.findAllPendingForAdmin();
+        log.info("SUCCESS → Retrieved {} pending documents", headers.size());
+        return headers;
+    }
     private void filterPendingDetails(List<DocumentHeader> headers) {
         headers.forEach(header -> {
             if (header.getDocumentDetails() != null) {
@@ -1406,19 +1581,19 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
         return documents;
     }
 
-    @Override
-    public List<DocumentHeader> getAllPendingDocuments() {
-        log.info("API CALL → Get All Pending Documents");
-
-        List<DocumentHeader> headers =
-                documentHeaderRepository.findAllPendingForAdmin();
-
-        filterPendingDetails(headers);
-
-        log.info("SUCCESS → Retrieved {} pending documents", headers.size());
-
-        return headers;
-    }
+//    @Override
+//    public List<DocumentHeader> getAllPendingDocuments() {
+//        log.info("API CALL → Get All Pending Documents");
+//
+//        List<DocumentHeader> headers =
+//                documentHeaderRepository.findAllPendingForAdmin();
+//
+//        filterPendingDetails(headers);
+//
+//        log.info("SUCCESS → Retrieved {} pending documents", headers.size());
+//
+//        return headers;
+//    }
 
     @Override
     public Long countDocumentHeadersByBranchId(Integer branch) {
@@ -1525,19 +1700,19 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
         return result != null ? result : List.of();
     }
 
-    @Override
-    public List<DocumentHeader> getPendingDocumentsByDepartment(Integer departmentId) {
-        log.info("API CALL → Get Pending Documents By Department | departmentId={}", departmentId);
-
-        List<DocumentHeader> headers =
-                documentHeaderRepository.findPendingByDepartment(departmentId);
-
-        filterPendingDetails(headers);
-
-        log.info("SUCCESS → Retrieved {} pending documents for department ID: {}", headers.size(), departmentId);
-
-        return headers;
-    }
+//    @Override
+//    public List<DocumentHeader> getPendingDocumentsByDepartment(Integer departmentId) {
+//        log.info("API CALL → Get Pending Documents By Department | departmentId={}", departmentId);
+//
+//        List<DocumentHeader> headers =
+//                documentHeaderRepository.findPendingByDepartment(departmentId);
+//
+//        filterPendingDetails(headers);
+//
+//        log.info("SUCCESS → Retrieved {} pending documents for department ID: {}", headers.size(), departmentId);
+//
+//        return headers;
+//    }
 
     @Override
     public List<DocumentResponse> getFilteredDocuments(Integer categoryId, DocApprovalStatus approvalStatus,

@@ -146,4 +146,80 @@ public class DocumentHeader {
     @Column(name = "lto_error")
     private String ltoError;
 
+
+    // ───── Case Information (Register Case & Evidence) ─────
+    @Column(name = "case_id")
+    private String caseId;
+
+    @Column(name = "fir_number")
+    private String firNumber;
+
+    @Column(name = "fir_date")
+    private Timestamp firDate;
+
+    @Column(name = "case_type_id")
+    private Integer caseTypeId;
+
+    @Column(name = "crime_type_id")
+    private Integer crimeTypeId;
+
+    @Column(name = "state_id")
+    private Integer stateId;
+
+    @Column(name = "district_id")
+    private Integer districtId;
+
+    @Column(name = "city_id")
+    private Integer cityId;
+
+    @Column(name = "police_station")
+    private String policeStation;
+
+    @Column(name = "investigating_officer")
+    private String investigatingOfficer;
+
+    @Column(name = "court_reference")
+    private String courtReference;
+
+    @Column(name = "priority_id")
+    private Integer priorityId;
+
+    @Column(name = "date_of_incident")
+    private Timestamp dateOfIncident;
+
+    @Column(name = "incident_location", length = 500)
+    private String incidentLocation;
+
+
+    // ───── Evidence Metadata ─────
+    @Column(name = "evidence_id")
+    private String evidenceId;
+
+    @Column(name = "exhibit_number")
+    private String exhibitNumber;
+
+    @Column(name = "evidence_type_id")
+    private Integer evidenceTypeId;
+
+    @Column(name = "source")
+    private String source;
+
+    @Column(name = "collection_location")
+    private String collectionLocation;
+
+    @Column(name = "collection_date")
+    private Timestamp collectionDate;
+
+    @Lob
+    @Column(name = "evidence_remarks")
+    private String evidenceRemarks;
+
+
+    // ───── Approval tracking (already existed in DB, was missing from the entity) ─────
+    @Column(name = "approval_status_by")
+    private String approvalStatusBy;
+
+    @Column(name = "approval_status_on")
+    private Timestamp approvalStatusOn;
+
 }

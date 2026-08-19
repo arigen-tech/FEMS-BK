@@ -163,6 +163,7 @@ public class DocumentController {
                         requestBody.getMetadata(),
                         requestBody.getDeletedMetaDataIds(),
                         requestBody.getFilePaths(),
+                        requestBody.getForwardingAuthority(),
                         version,
                         request
                 );
@@ -261,22 +262,24 @@ public class DocumentController {
     }
 
     // Update the approval status of a document
+    // Update the approval status of a document (HEADER LEVEL)
     @PatchMapping("/{id}/approval-status")
     public ResponseEntity<DocumentHeader> updateApprovalStatus(
             @PathVariable Integer id,
             @RequestParam("status") DocApprovalStatus status,
-            @RequestParam(value = "rejectionReason", required = false) String rejectionReason,HttpServletRequest request) {
+            @RequestParam(value = "rejectionReason", required = false) String rejectionReason) {
 
         log.info("API CALL → Update Document Approval Status | id={} status={}", id, status);
 
-        documentDetailsService.updateDetailStatus(id, status, rejectionReason,request);
+        Integer employeeId = currentUser.getCurrentEmployeeOrThrow().getId();
+
+        DocumentHeader updatedDocument =
+                documentHeaderService.updateApprovalStatus(id, status, rejectionReason, employeeId);
 
         log.info("SUCCESS → Document Approval Status Updated | id={} status={}", id, status);
 
-        return new ResponseEntity<>(HttpStatus.OK);
+        return new ResponseEntity<>(updatedDocument, HttpStatus.OK);
     }
-
-
     // Update the active status of a document
     @PatchMapping("/{id}/active-status")
     public ResponseEntity<DocumentHeader> updateActiveStatus(
@@ -858,27 +861,21 @@ public class DocumentController {
 
         log.info("API CALL → Get Pending Documents By Scope | branchId={} departmentId={}", branchId, departmentId);
 
-        if (hasRole(userDetails, "ADMIN")) {
-            log.debug("Admin access - returning all pending documents");
-            return ResponseEntity.ok(
-                    documentHeaderService.getAllPendingDocuments()
-            );
+        if (hasRole(userDetails, "SYSTEM ADMIN")) {
+            log.debug("System Admin access - returning all pending documents");
+            return ResponseEntity.ok(documentHeaderService.getAllPendingDocuments());
 
-        } else if (hasRole(userDetails, "BRANCH ADMIN")) {
-            log.debug("Branch Admin access - returning pending documents for branch: {}", branchId);
-            return ResponseEntity.ok(
-                    documentHeaderService.getPendingDocumentsByBranch(branchId)
-            );
+        } else if (hasRole(userDetails, "LABORATORY ADMIN / HOD")) {
+            log.debug("Lab Admin/Director access - returning pending documents for branch: {}", branchId);
+            return ResponseEntity.ok(documentHeaderService.getPendingDocumentsByBranch(branchId));
 
-        } else if (hasRole(userDetails, "DEPARTMENT ADMIN")) {
+        } else if (hasRole(userDetails, "SCIENTIFIC OFFICER") || hasRole(userDetails, "CASE & EVIDENCE OFFICER")) {
             if (departmentId == null) {
-                log.warn("Department Admin access but departmentId is null");
+                log.warn("Officer access but departmentId is null");
                 return ResponseEntity.badRequest().body(Collections.emptyList());
             }
-            log.debug("Department Admin access - returning pending documents for department: {}", departmentId);
-            return ResponseEntity.ok(
-                    documentHeaderService.getPendingDocumentsByDepartment(departmentId)
-            );
+            log.debug("Officer access - returning pending documents for department: {}", departmentId);
+            return ResponseEntity.ok(documentHeaderService.getPendingDocumentsByDepartment(departmentId));
         }
 
         log.warn("Access denied - user doesn't have required role");
@@ -900,13 +897,13 @@ public class DocumentController {
 
         log.info("API CALL → Get Pending Documents By Branch Only | branchId={}", branchId);
 
-        List<DocumentHeader> pendingDocuments = new ArrayList<>();
+        List<DocumentHeader> pendingDocuments;
 
-        if (userDetails.getAuthorities().stream().anyMatch(role -> role.getAuthority().equals("ADMIN"))) {
-            log.debug("Admin access - returning all pending documents");
+        if (hasRole(userDetails, "SYSTEM ADMIN")) {
+            log.debug("System Admin access - returning all pending documents");
             pendingDocuments = documentHeaderService.getAllPendingDocuments();
-        } else if (userDetails.getAuthorities().stream().anyMatch(role -> role.getAuthority().equals("BRANCH ADMIN"))) {
-            log.debug("Branch Admin access - returning pending documents for branch: {}", branchId);
+        } else if (hasRole(userDetails, "LABORATORY ADMIN / HOD")) {
+            log.debug("Lab Admin/Director access - returning pending documents for branch: {}", branchId);
             pendingDocuments = documentHeaderService.getPendingDocumentsByBranch(branchId);
         } else {
             log.warn("Access denied - user doesn't have required role");
@@ -916,7 +913,6 @@ public class DocumentController {
         log.info("SUCCESS → Retrieved {} pending documents", pendingDocuments.size());
         return ResponseEntity.ok(pendingDocuments);
     }
-
 
 
     @GetMapping("/approvedByBranch/{employeeId}")

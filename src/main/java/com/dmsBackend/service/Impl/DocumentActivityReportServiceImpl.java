@@ -94,6 +94,9 @@ public class DocumentActivityReportServiceImpl
             }
         }
 
+        // -------- Audit timestamp (was missing → caused CREATED_AT NOT NULL violation) --------
+        r.setCreatedAt(LocalDateTime.now());
+
         repository.save(r);
     }
 

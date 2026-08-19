@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Page;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -43,14 +44,17 @@ public interface DocumentHeaderService {
     //update documents
 
 
-    @Transactional
-    ApiResponse<MessageResponse> updateDocumentWithFiles(
+    public ApiResponse<MessageResponse> updateDocumentWithFiles(
             DocumentHeader documentHeader,
             List<DocumentSaveRequest.MetadataRequest> metadata,
             List<Long> deletedMetaDataIds,
             List<DocumentSaveRequest.FilePathVersion> filePaths,
+            DocumentSaveRequest.ForwardingAuthorityRequest forwardingAuthority,
             String version,
             HttpServletRequest request);
+
+    String saveForwardingLetterFile(MultipartFile file, Integer documentId);
+    void updateForwardingLetterPath(Integer documentId, String filePath);
 
     DocumentHeader updateActiveStatus(Integer id, boolean isActive);
 

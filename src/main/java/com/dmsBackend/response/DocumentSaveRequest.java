@@ -3,6 +3,7 @@ package com.dmsBackend.response;
 import com.dmsBackend.entity.DocumentHeader;
 import lombok.Data;
 
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 
@@ -29,6 +30,16 @@ public class DocumentSaveRequest {
     }
 
     private List<Long> deletedMetaDataIds;
+
+    public ForwardingAuthorityRequest getForwardingAuthority() {
+        return forwardingAuthority;
+    }
+
+    public void setForwardingAuthority(ForwardingAuthorityRequest forwardingAuthority) {
+        this.forwardingAuthority = forwardingAuthority;
+    }
+
+    private ForwardingAuthorityRequest forwardingAuthority;
 
 
     // Getters and setters
@@ -138,6 +149,43 @@ public class DocumentSaveRequest {
         private long id;
         private String key;
         private String value;
+    }
+
+    // Matches the "forwardingAuthority" object shape sent by
+    // ForwardingAuthorityDetails.jsx / DocumentManagement.jsx's payload.
+    @Data
+    public static class ForwardingAuthorityRequest {
+        private Integer forwardingAuthorityTypeId;
+        private String authorityName;
+        private String designation;
+        private String organisation;
+        private Integer districtId;
+        private Integer cityId; // not yet collected by the frontend form; will save null until added
+        private String address;
+        private String contactNumber;
+        private String email;
+        private String forwardingLetterNumber;
+        private String forwardingLetterPath;
+        private Timestamp forwardingDate;
+        private Integer modeOfSubmissionId;
+        private String courierAgency;
+        private String awbConsignmentNumber;
+        private Timestamp bookingDate;
+        private Timestamp dispatchDate;
+        private Timestamp expectedDeliveryDate;
+        private Timestamp actualDeliveryDate;
+        private String parcelId;
+        private String parcelNumber;
+        private Integer numberOfExhibits;
+        private Integer packageTypeId;
+        private String sealNumber;
+        private String sealDescription;
+        private String sealCondition;
+        private String packageCondition;
+        private Timestamp receivedDate;
+        private String receivedTime;
+        private String receivedBy;
+        private String remarks;
     }
 
 }
