@@ -608,14 +608,11 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
             existingDocument.setDateOfIncident(documentHeader.getDateOfIncident());
             existingDocument.setIncidentLocation(documentHeader.getIncidentLocation());
 
-            // Evidence Metadata
+            // Evidence Metadata — evidenceId/exhibitNumber stay header-level;
+            // evidenceType/description now live per-file on document_details
+            // (synced inside documentDetailsService.updateFileDetails below)
             existingDocument.setEvidenceId(documentHeader.getEvidenceId());
             existingDocument.setExhibitNumber(documentHeader.getExhibitNumber());
-            existingDocument.setEvidenceTypeId(documentHeader.getEvidenceTypeId());
-            existingDocument.setSource(documentHeader.getSource());
-            existingDocument.setCollectionLocation(documentHeader.getCollectionLocation());
-            existingDocument.setCollectionDate(documentHeader.getCollectionDate());
-            existingDocument.setEvidenceRemarks(documentHeader.getEvidenceRemarks());
 
             // 7️⃣ Update files (including waiting room files)
             List<DocumentDetails> updatedFiles = documentDetailsService.updateFileDetails(

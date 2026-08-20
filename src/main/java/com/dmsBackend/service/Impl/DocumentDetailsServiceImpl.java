@@ -843,6 +843,8 @@ public class DocumentDetailsServiceImpl implements DocumentDetailsService {
                 d.setFileSizeBytes(fpv.getFileSizeBytes());
                 d.setFileSizeHuman(fpv.getFileSizeHuman());
                 d.setPageCounts(fpv.getPageCounts());
+                d.setEvidenceTypeId(fpv.getEvidenceTypeId());
+                d.setEvidenceDescription(fpv.getEvidenceDescription());
                 d.setCreatedOn(now);
                 d.setUpdatedOn(now);
                 d.setCreatedBy(actor);
@@ -881,7 +883,6 @@ public class DocumentDetailsServiceImpl implements DocumentDetailsService {
 
         log.info("SUCCESS → Saved {} file details for header {}", files.size(), header.getId());
     }
-
     @Override
     @Transactional
     public void updateDetailStatus(Integer detailId, DocApprovalStatus newStatus, String reason, HttpServletRequest request) {
@@ -1173,72 +1174,6 @@ public class DocumentDetailsServiceImpl implements DocumentDetailsService {
                 ));
 
         // ✅ 1. Process existing DB files
-//        for (DocumentDetails oldFile : oldFiles) {
-//
-//            if (ArchiveJob.Status.ARCHIVED.name().equals(oldFile.getArchivalStatus())) {
-//                log.info("📌 Skipping archived file: {}", oldFile.getPath());
-//                updatedFiles.add(oldFile);
-//                continue;
-//            }
-//
-//            DocumentSaveRequest.FilePathVersion newFile = newFilesMap.get(oldFile.getDocName());
-//
-//            if (newFile == null) {
-//                // Case 4: File deleted (local)
-//                Path oldLocalPath = Paths.get(documentStoragePath, oldFile.getPath());
-//                try {
-//                    Files.deleteIfExists(oldLocalPath);
-//                    log.info("🗑️ Deleted local file: {}", oldLocalPath);
-//                } catch (Exception e) {
-//                    throw new RuntimeException("Failed to delete local file: " + oldLocalPath, e);
-//                }
-//                documentDetailsRepository.delete(oldFile);
-//                continue;
-//            }
-//
-//            String newFileName = Paths.get(newFile.getPath()).getFileName().toString();
-//
-//            // Resolve year per file
-//            YearMaster newYearMaster = yearMasterRepository.findById(Math.toIntExact(newFile.getYearId()))
-//                    .orElseThrow(() -> new ResourceNotFoundException("YearMaster not found with id " + newFile.getYearId()));
-//
-//            // Regenerate path
-//            String newRelativePath = generateNewPath(branch, department, newYearMaster, categoryMaster, newFile.getVersion(), newFileName);
-//
-//            boolean pathChanged = !oldFile.getPath().equals(newRelativePath);
-//            boolean versionChanged = !oldFile.getVersion().equals(newFile.getVersion());
-//            boolean yearChanged = !oldFile.getYearMaster().getId().equals(newFile.getYearId());
-//
-//            if (pathChanged || versionChanged || yearChanged) {
-//                // Case 2: Move locally
-//                Path oldLocalPath = Paths.get(documentStoragePath, oldFile.getPath());
-//                Path newLocalDir = Paths.get(documentStoragePath, newRelativePath).getParent();
-//
-//                try {
-//                    Files.createDirectories(newLocalDir); // ensure dir exists
-//                    Files.move(oldLocalPath, newLocalDir.resolve(newFileName), StandardCopyOption.REPLACE_EXISTING);
-//                    log.info("📂 Moved local file: {} → {}", oldLocalPath, newRelativePath);
-//                } catch (Exception e) {
-//                    throw new RuntimeException("Failed to move local file: " + oldLocalPath + " → " + newRelativePath, e);
-//                }
-//
-//                oldFile.setPath(newRelativePath);
-//                oldFile.setVersion(newFile.getVersion());
-//                oldFile.setDocName(newFileName);
-//                oldFile.setYearMaster(newYearMaster);
-//            } else {
-//                // Case 1: No change
-//                log.info("✅ Unchanged file: {}", oldFile.getPath());
-//            }
-//
-//            oldFile.setUpdatedOn(new Timestamp(System.currentTimeMillis()));
-//            documentDetailsRepository.save(oldFile);
-//            updatedFiles.add(oldFile);
-//        }
-
-        // ✅ 2. Process new files
-
-        // ✅ 1. Process existing DB files
         for (DocumentDetails oldFile : oldFiles) {
 
             if (ArchiveJob.Status.ARCHIVED.name().equals(oldFile.getArchivalStatus())) {
@@ -1308,6 +1243,10 @@ public class DocumentDetailsServiceImpl implements DocumentDetailsService {
                 log.debug("✅ Unchanged file: {}", oldFile.getPath());
             }
 
+            // ✅ Sync evidence metadata regardless of whether path/version/year changed
+            oldFile.setEvidenceTypeId(newFile.getEvidenceTypeId());
+            oldFile.setEvidenceDescription(newFile.getEvidenceDescription());
+
             oldFile.setUpdatedOn(new Timestamp(System.currentTimeMillis()));
             documentDetailsRepository.save(oldFile);
             updatedFiles.add(oldFile);
@@ -1341,6 +1280,8 @@ public class DocumentDetailsServiceImpl implements DocumentDetailsService {
                 documentDetails.setFileSizeBytes(newFile.getFileSizeBytes());
                 documentDetails.setMimeType(newFile.getMimeType());
                 documentDetails.setFileType(newFile.getFileType());
+                documentDetails.setEvidenceTypeId(newFile.getEvidenceTypeId());
+                documentDetails.setEvidenceDescription(newFile.getEvidenceDescription());
 
                 // Handle waiting room reference for new files in update
                 if (Boolean.TRUE.equals(newFile.getIsWaitingRoomFile()) && newFile.getWaitingRoomId() != null) {
@@ -1982,6 +1923,10 @@ public class DocumentDetailsServiceImpl implements DocumentDetailsService {
                 detail.setFileSizeBytes(fp.getFileSizeBytes());
                 detail.setFileSizeHuman(fp.getFileSizeHuman());
                 detail.setPageCounts(fp.getPageCounts());
+
+                // ✅ Evidence metadata (per file)
+                detail.setEvidenceTypeId(fp.getEvidenceTypeId());
+                detail.setEvidenceDescription(fp.getEvidenceDescription());
 
                 // ✅ Handle Waiting Room reference properly
                 if (Boolean.TRUE.equals(fp.getIsWaitingRoomFile()) && fp.getWaitingRoomId() != null) {

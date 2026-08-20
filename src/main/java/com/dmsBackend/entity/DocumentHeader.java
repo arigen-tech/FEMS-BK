@@ -191,28 +191,12 @@ public class DocumentHeader {
     private String incidentLocation;
 
 
-    // ───── Evidence Metadata ─────
+    // ───── Evidence Metadata (header-level only; type/description moved to document_details) ─────
     @Column(name = "evidence_id")
     private String evidenceId;
 
     @Column(name = "exhibit_number")
     private String exhibitNumber;
-
-    @Column(name = "evidence_type_id")
-    private Integer evidenceTypeId;
-
-    @Column(name = "source")
-    private String source;
-
-    @Column(name = "collection_location")
-    private String collectionLocation;
-
-    @Column(name = "collection_date")
-    private Timestamp collectionDate;
-
-    @Lob
-    @Column(name = "evidence_remarks")
-    private String evidenceRemarks;
 
 
     // ───── Approval tracking (already existed in DB, was missing from the entity) ─────

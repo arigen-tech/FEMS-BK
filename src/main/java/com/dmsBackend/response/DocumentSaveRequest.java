@@ -71,6 +71,26 @@ public class DocumentSaveRequest {
         private Integer waitingRoomId; // Add this
         private Boolean isWaitingRoomFile; // Add this
 
+        // ───── Evidence Metadata (per file) ─────
+        private Integer evidenceTypeId;
+        private String evidenceDescription;
+
+        public Integer getEvidenceTypeId() {
+            return evidenceTypeId;
+        }
+
+        public void setEvidenceTypeId(Integer evidenceTypeId) {
+            this.evidenceTypeId = evidenceTypeId;
+        }
+
+        public String getEvidenceDescription() {
+            return evidenceDescription;
+        }
+
+        public void setEvidenceDescription(String evidenceDescription) {
+            this.evidenceDescription = evidenceDescription;
+        }
+
         public Integer getPageCounts() {
             return pageCounts;
         }

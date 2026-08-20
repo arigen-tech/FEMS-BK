@@ -157,6 +157,14 @@ public class DocumentDetails {
     private String fileSizeHuman;
     private Integer pageCounts;
 
+    // ───── Evidence Metadata (moved here from document_header — per file) ─────
+    @Column(name = "evidence_type_id")
+    private Integer evidenceTypeId;
+
+    @Lob
+    @Column(name = "evidence_description")
+    private String evidenceDescription;
+
 
 
 
