@@ -158,12 +158,29 @@ public class DocumentDetails {
     private Integer pageCounts;
 
     // ───── Evidence Metadata (moved here from document_header — per file) ─────
-    @Column(name = "evidence_type_id")
-    private Integer evidenceTypeId;
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "evidence_type_id")
+    private EvidenceTypeMaster evidenceTypeId;
 
     @Lob
     @Column(name = "evidence_description")
     private String evidenceDescription;
+
+    // ───── Assignment Information ─────
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_division_id")
+    @JsonIgnore
+    private DepartmentMaster department;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_employee_id")
+    @JsonIgnore
+    private Employee empId;
+
+    @Lob
+    @Column(name = "assignment_remark")
+    private String assignmentRemark;
 
 
 

@@ -65,6 +65,8 @@ public class DocumentDetailsServiceImpl implements DocumentDetailsService {
     AuditLogUtil auditLogUtil;
     @Autowired
     private FileEncryptionUtil fileEncryptionUtil;
+    @Autowired
+    private EvidenceTypeMasterRepository evidenceTypeMasterRepository;
 
     @Value("${document.storage.path}")
     private String documentStoragePath;
@@ -843,7 +845,15 @@ public class DocumentDetailsServiceImpl implements DocumentDetailsService {
                 d.setFileSizeBytes(fpv.getFileSizeBytes());
                 d.setFileSizeHuman(fpv.getFileSizeHuman());
                 d.setPageCounts(fpv.getPageCounts());
-                d.setEvidenceTypeId(fpv.getEvidenceTypeId());
+                if (fpv.getEvidenceTypeId() != null) {
+                    EvidenceTypeMaster evidenceType = evidenceTypeMasterRepository
+                            .findById(fpv.getEvidenceTypeId())
+                            .orElseThrow(() -> new ResourceNotFoundException(
+                                    "Evidence Type not found: " + fpv.getEvidenceTypeId()
+                            ));
+
+                    d.setEvidenceTypeId(evidenceType);
+                }
                 d.setEvidenceDescription(fpv.getEvidenceDescription());
                 d.setCreatedOn(now);
                 d.setUpdatedOn(now);
@@ -1244,7 +1254,15 @@ public class DocumentDetailsServiceImpl implements DocumentDetailsService {
             }
 
             // ✅ Sync evidence metadata regardless of whether path/version/year changed
-            oldFile.setEvidenceTypeId(newFile.getEvidenceTypeId());
+            if (newFile.getEvidenceTypeId() != null) {
+                EvidenceTypeMaster evidenceType = evidenceTypeMasterRepository
+                        .findById(newFile.getEvidenceTypeId())
+                        .orElseThrow(() -> new ResourceNotFoundException(
+                                "Evidence Type not found: " + newFile.getEvidenceTypeId()
+                        ));
+
+                oldFile.setEvidenceTypeId(evidenceType);
+            }
             oldFile.setEvidenceDescription(newFile.getEvidenceDescription());
 
             oldFile.setUpdatedOn(new Timestamp(System.currentTimeMillis()));
@@ -1280,8 +1298,15 @@ public class DocumentDetailsServiceImpl implements DocumentDetailsService {
                 documentDetails.setFileSizeBytes(newFile.getFileSizeBytes());
                 documentDetails.setMimeType(newFile.getMimeType());
                 documentDetails.setFileType(newFile.getFileType());
-                documentDetails.setEvidenceTypeId(newFile.getEvidenceTypeId());
-                documentDetails.setEvidenceDescription(newFile.getEvidenceDescription());
+                if (newFile.getEvidenceTypeId() != null) {
+                    EvidenceTypeMaster evidenceType = evidenceTypeMasterRepository
+                            .findById(newFile.getEvidenceTypeId())
+                            .orElseThrow(() -> new ResourceNotFoundException(
+                                    "Evidence Type not found: " + newFile.getEvidenceTypeId()
+                            ));
+
+                    documentDetails.setEvidenceTypeId(evidenceType);
+                }                documentDetails.setEvidenceDescription(newFile.getEvidenceDescription());
 
                 // Handle waiting room reference for new files in update
                 if (Boolean.TRUE.equals(newFile.getIsWaitingRoomFile()) && newFile.getWaitingRoomId() != null) {
@@ -1925,7 +1950,17 @@ public class DocumentDetailsServiceImpl implements DocumentDetailsService {
                 detail.setPageCounts(fp.getPageCounts());
 
                 // ✅ Evidence metadata (per file)
-                detail.setEvidenceTypeId(fp.getEvidenceTypeId());
+                if (fp.getEvidenceTypeId() != null) {
+                    EvidenceTypeMaster evidenceType = evidenceTypeMasterRepository
+                            .findById(fp.getEvidenceTypeId())
+                            .orElseThrow(() -> new ResourceNotFoundException(
+                                    "Evidence Type not found with ID: " + fp.getEvidenceTypeId()
+                            ));
+
+                    detail.setEvidenceTypeId(evidenceType);
+                } else {
+                    detail.setEvidenceTypeId(null);
+                }
                 detail.setEvidenceDescription(fp.getEvidenceDescription());
 
                 // ✅ Handle Waiting Room reference properly

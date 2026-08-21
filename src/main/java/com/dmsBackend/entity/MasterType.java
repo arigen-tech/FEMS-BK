@@ -1,13 +1,9 @@
+// MasterType.java — 4 entries added, everything else unchanged
 package com.dmsBackend.entity;
 
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
-/**
- * URL key -> Spring bean name for every master added for
- * Register Case & Evidence. The MasterController uses this to route
- * a request like /master/case-type/getAll/1 to caseTypeMasterService.
- */
 public enum MasterType {
 
     CASE_TYPE("case-type", "caseTypeMasterService"),
@@ -19,7 +15,11 @@ public enum MasterType {
     EVIDENCE_TYPE("evidence-type", "evidenceTypeMasterService"),
     FORWARDING_AUTHORITY_TYPE("forwarding-authority-type", "forwardingAuthorityTypeMasterService"),
     MODE_OF_SUBMISSION("mode-of-submission", "modeOfSubmissionMasterService"),
-    PACKAGE_TYPE("package-type", "packageTypeMasterService");
+    PACKAGE_TYPE("package-type", "packageTypeMasterService"),
+    PURPOSE("purpose", "purposeMasterService"),
+    NATURE_OF_EXAMINATION("nature-of-examination", "natureOfExaminationMasterService"),
+    SEAL_STATUS("seal-status", "sealStatusMasterService"),
+    PARCEL_CONDITION("parcel-condition", "parcelConditionMasterService");
 
     private final String key;
     private final String beanName;

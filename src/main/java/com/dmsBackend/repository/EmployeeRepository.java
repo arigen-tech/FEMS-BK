@@ -222,4 +222,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
             @Param("branchId") Integer branchId,
             @Param("departmentId") Integer departmentId
     );
+
+    List<Employee> findByDepartmentIdAndRoleIdAndIsActiveTrue(Integer divisionId, Integer id);
+
+    List<Employee> findByDepartmentIdAndIsActiveTrue(Integer divisionId);
 }

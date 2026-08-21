@@ -1,7 +1,9 @@
+// GenericMasterServiceImpl.java — full file, with the 2 HasDefaultParcelCondition blocks
 package com.dmsBackend.service.Impl;
 
 import com.dmsBackend.entity.BaseMasterEntity;
 import com.dmsBackend.entity.CodedMaster;
+import com.dmsBackend.entity.HasDefaultParcelCondition;
 import com.dmsBackend.entity.ParentAware;
 import com.dmsBackend.entity.ParentedMasterEntity;
 import com.dmsBackend.exception.ResourceNotFoundException;
@@ -20,13 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * All CRUD + audit-log logic for every master type lives here, ONCE.
- * Each concrete master (CaseType, CrimeType, State, District, City,
- * Priority, EvidenceType, ForwardingAuthorityType, ModeOfSubmission,
- * PackageType) only needs a 15-line subclass that wires up its own
- * repository (see CaseTypeMasterServiceImpl etc.).
- */
 @Slf4j
 public abstract class GenericMasterServiceImpl<T extends BaseMasterEntity> implements MasterService<T> {
 
@@ -36,13 +31,8 @@ public abstract class GenericMasterServiceImpl<T extends BaseMasterEntity> imple
     @Autowired
     protected AuditLogUtil auditLogUtil;
 
-    /** The Spring Data repository backing this master type. */
     protected abstract MasterRepository<T> getRepository();
-
-    /** Short label used in logs / audit trail, e.g. "CaseType". */
     protected abstract String getEntityLabel();
-
-    /** A fresh, empty instance of T. */
     protected abstract T newInstance();
 
     // ======================= CREATE =======================
@@ -69,6 +59,10 @@ public abstract class GenericMasterServiceImpl<T extends BaseMasterEntity> imple
 
         if (entity instanceof CodedMaster && request.getCode() != null) {
             ((CodedMaster) entity).setCode(request.getCode());
+        }
+
+        if (entity instanceof HasDefaultParcelCondition && request.getDefaultParcelConditionId() != null) {
+            ((HasDefaultParcelCondition) entity).setDefaultParcelConditionId(request.getDefaultParcelConditionId());
         }
 
         try {
@@ -145,6 +139,10 @@ public abstract class GenericMasterServiceImpl<T extends BaseMasterEntity> imple
 
         if (existing instanceof CodedMaster && request.getCode() != null) {
             ((CodedMaster) existing).setCode(request.getCode());
+        }
+
+        if (existing instanceof HasDefaultParcelCondition && request.getDefaultParcelConditionId() != null) {
+            ((HasDefaultParcelCondition) existing).setDefaultParcelConditionId(request.getDefaultParcelConditionId());
         }
 
         T updated = getRepository().save(existing);

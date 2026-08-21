@@ -27,4 +27,8 @@ public interface EmployeeRoleRepository extends JpaRepository<EmployeeRole, Inte
 
 
     List<EmployeeRole> findByEmpId_Id(Integer empId);
-}
+
+    @Query("SELECT er.empId FROM EmployeeRole er WHERE er.roleId.role = :roleName AND er.isActive = true AND er.empId.department.id = :departmentId AND er.empId.isActive = true")
+    List<Employee> findActiveEmployeesByRoleNameAndDepartmentId(
+            @Param("roleName") String roleName,
+            @Param("departmentId") Integer departmentId);}

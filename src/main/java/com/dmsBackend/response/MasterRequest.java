@@ -1,18 +1,12 @@
+// MasterRequest.java — add this one field to whatever your real file already has
 package com.dmsBackend.response;
 
 import lombok.Data;
 
-/**
- * One request DTO for every master type.
- * parentId is only used by District, City, and EvidenceType
- * (ignored for the simple masters).
- */
 @Data
 public class MasterRequest {
-
     private String name;
-
     private Integer parentId;
-
     private String code;
+    private Integer defaultParcelConditionId; // NEW — used only by SealStatusMaster
 }
