@@ -45,6 +45,19 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
 
     private final DocumentHeaderRepository documentHeaderRepository;
     private final CategoryMasterRepository categoryMasterRepository;
+    @Autowired
+    private  CaseTypeMasterRepository caseTypeMasterRepository;
+    @Autowired
+    private  CrimeTypeMasterRepository crimeTypeMasterRepository;
+    @Autowired
+    private  StateMasterRepository stateMasterRepository;
+    @Autowired
+    private  DistrictMasterRepository districtMasterRepository;
+    @Autowired
+    private  CityMasterRepository cityMasterRepository;
+    @Autowired
+    private PriorityMasterRepository priorityMasterRepository;
+
 
     @Autowired
     private PDFGenerator pdfGenerator;
@@ -86,11 +99,7 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
     @Autowired
     private ForwardingAuthorityTypeMasterRepository forwardingAuthorityTypeRepository;
 
-    @Autowired
-    private DistrictMasterRepository districtMasterRepository;
 
-    @Autowired
-    private CityMasterRepository cityMasterRepository;
 
     @Autowired
     private ModeOfSubmissionMasterRepository modeOfSubmissionRepository;
@@ -492,20 +501,45 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
         List<Integer> waitingRoomIdsToRollback = new ArrayList<>();
 
         try {
-            // ✅ Extract waiting room IDs for rollback tracking
+
+            // =========================================================
+            // Extract waiting room IDs for rollback tracking
+            // =========================================================
+
             List<Integer> waitingRoomIdsInRequest = filePaths.stream()
                     .filter(fp -> fp.getWaitingRoomId() != null)
-                    .map(fp -> fp.getWaitingRoomId())
+                    .map(DocumentSaveRequest.FilePathVersion::getWaitingRoomId)
                     .collect(Collectors.toList());
+
             waitingRoomIdsToRollback.addAll(waitingRoomIdsInRequest);
 
-            log.debug("Found {} waiting room files in update request", waitingRoomIdsInRequest.size());
+            log.debug("Found {} waiting room files in update request",
+                    waitingRoomIdsInRequest.size());
 
-            // 1️⃣ Check for duplicate fileNo (excluding current doc)
-            Optional<DocumentHeader> duplicate = documentHeaderRepository.findByFileNo(documentHeader.getFileNo());
-            if (duplicate.isPresent() && !duplicate.get().getId().equals(documentHeader.getId())) {
-                log.warn("Duplicate fileNo found: {} for document {}", documentHeader.getFileNo(), documentHeader.getId());
-                msg.setMsg("Document with fileNo " + documentHeader.getFileNo() + " already exists");
+
+            // =========================================================
+            // 1. Check duplicate fileNo
+            // =========================================================
+
+            Optional<DocumentHeader> duplicate =
+                    documentHeaderRepository.findByFileNo(
+                            documentHeader.getFileNo()
+                    );
+
+            if (duplicate.isPresent()
+                    && !duplicate.get().getId().equals(documentHeader.getId())) {
+
+                log.warn(
+                        "Duplicate fileNo found: {} for document {}",
+                        documentHeader.getFileNo(),
+                        documentHeader.getId()
+                );
+
+                msg.setMsg(
+                        "Document with fileNo "
+                                + documentHeader.getFileNo()
+                                + " already exists"
+                );
 
                 auditLogUtil.logDocumentAction(
                         empObj,
@@ -521,270 +555,928 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                 return ResponseUtils.createFailureResponse(
                         msg,
                         new TypeReference<>() {},
-                        "Duplicate fileNo: " + documentHeader.getFileNo(),
+                        "Duplicate fileNo: "
+                                + documentHeader.getFileNo(),
                         HttpStatus.CONFLICT.value()
                 );
             }
 
-            // 2️⃣ Load existing document
-            DocumentHeader existingDocument = documentHeaderRepository.findById(documentHeader.getId())
-                    .orElseThrow(() -> {
-                        log.error("Document not found for update | documentId={}", documentHeader.getId());
-                        return new ResourceNotFoundException("Document not found with id " + documentHeader.getId());
+
+            // =========================================================
+            // 2. Load existing document
+            // =========================================================
+
+            DocumentHeader existingDocument =
+                    documentHeaderRepository.findById(
+                            documentHeader.getId()
+                    ).orElseThrow(() -> {
+
+                        log.error(
+                                "Document not found for update | documentId={}",
+                                documentHeader.getId()
+                        );
+
+                        return new ResourceNotFoundException(
+                                "Document not found with id "
+                                        + documentHeader.getId()
+                        );
                     });
 
-            // 3️⃣ MOVE WAITING ROOM FILES TO DOCUMENT STORAGE (for new waiting room files in update)
+
+            // =========================================================
+            // 3. Move waiting room files
+            // =========================================================
+
             if (!waitingRoomIdsInRequest.isEmpty()) {
-                log.info("Moving {} waiting room files to document storage during update", waitingRoomIdsInRequest.size());
-                moveWaitingRoomFilesToDocumentStorage(filePaths, empObj, existingDocument.getCategoryMaster());
+
+                log.info(
+                        "Moving {} waiting room files to document storage during update",
+                        waitingRoomIdsInRequest.size()
+                );
+
+                moveWaitingRoomFilesToDocumentStorage(
+                        filePaths,
+                        empObj,
+                        existingDocument.getCategoryMaster()
+                );
             }
 
-            // 4️⃣ Capture previous data for audit
+
+            // =========================================================
+            // 4. Capture previous data for audit
+            // =========================================================
+
             Map<String, Object> previousDocData = Map.of(
-                    "title", existingDocument.getTitle(),
-                    "subject", existingDocument.getSubject(),
-                    "category", existingDocument.getCategoryMaster().getName(),
-                    "year", (existingDocument.getDocumentDetails() != null && !existingDocument.getDocumentDetails().isEmpty())
-                            ? existingDocument.getDocumentDetails().get(0).getYearMaster().getName()
+                    "title",
+                    existingDocument.getTitle(),
+
+                    "subject",
+                    existingDocument.getSubject(),
+
+                    "category",
+                    existingDocument.getCategoryMaster() != null
+                            ? existingDocument.getCategoryMaster().getName()
+                            : null,
+
+                    "year",
+                    (
+                            existingDocument.getDocumentDetails() != null
+                                    && !existingDocument.getDocumentDetails().isEmpty()
+                                    && existingDocument.getDocumentDetails()
+                                    .get(0)
+                                    .getYearMaster() != null
+                    )
+                            ? existingDocument.getDocumentDetails()
+                            .get(0)
+                            .getYearMaster()
+                            .getName()
                             : null
             );
 
-            List<DocumentDetailsResponse> previousFileDetails = existingDocument.getDocumentDetails()
-                    .stream()
-                    .map(file -> {
-                        DocumentDetailsResponse resp = new DocumentDetailsResponse();
-                        resp.setId(file.getId());
-                        resp.setDocName(file.getDocName());
-                        resp.setVersion(file.getVersion());
-                        return resp;
-                    })
-                    .toList();
 
-            // 5️⃣ Detect changes
-            boolean categoryChanged = !existingDocument.getCategoryMaster().getId()
-                    .equals(documentHeader.getCategoryMaster().getId());
+            List<DocumentDetailsResponse> previousFileDetails =
+                    existingDocument.getDocumentDetails()
+                            .stream()
+                            .map(file -> {
 
-            Long incomingYearId = (filePaths != null && !filePaths.isEmpty()) ? filePaths.get(0).getYearId() : null;
-            boolean yearChanged = incomingYearId != null &&
-                    existingDocument.getDocumentDetails() != null &&
-                    !existingDocument.getDocumentDetails().isEmpty() &&
-                    !existingDocument.getDocumentDetails().stream()
-                            .allMatch(d -> d.getYearMaster().getId().equals(incomingYearId));
+                                DocumentDetailsResponse resp =
+                                        new DocumentDetailsResponse();
 
-            log.debug("Update changes - categoryChanged: {}, yearChanged: {}", categoryChanged, yearChanged);
+                                resp.setId(file.getId());
+                                resp.setDocName(file.getDocName());
+                                resp.setVersion(file.getVersion());
 
-            if (categoryChanged) {
-                CategoryMaster categoryMaster = categoryMasterRepository.findById(documentHeader.getCategoryMaster().getId())
-                        .orElseThrow(() -> new ResourceNotFoundException("CategoryMaster not found"));
-                existingDocument.setCategoryMaster(categoryMaster);
+                                return resp;
+                            })
+                            .toList();
+
+
+            // =========================================================
+            // 5. Detect category/year changes
+            // =========================================================
+
+            Long existingCategoryId =
+                    Long.valueOf(existingDocument.getCategoryMaster() != null
+                            ? existingDocument.getCategoryMaster().getId()
+                            : null);
+
+            Long incomingCategoryId =
+                    Long.valueOf(documentHeader.getCategoryMaster() != null
+                            ? documentHeader.getCategoryMaster().getId()
+                            : null);
+
+            boolean categoryChanged =
+                    !Objects.equals(
+                            existingCategoryId,
+                            incomingCategoryId
+                    );
+
+
+            Long incomingYearId =
+                    (filePaths != null && !filePaths.isEmpty())
+                            ? filePaths.get(0).getYearId()
+                            : null;
+
+
+            boolean yearChanged =
+                    incomingYearId != null
+                            && existingDocument.getDocumentDetails() != null
+                            && !existingDocument.getDocumentDetails().isEmpty()
+                            && !existingDocument.getDocumentDetails()
+                            .stream()
+                            .allMatch(d ->
+                                    d.getYearMaster() != null
+                                            && d.getYearMaster()
+                                            .getId()
+                                            .equals(incomingYearId)
+                            );
+
+
+            log.debug(
+                    "Update changes - categoryChanged: {}, yearChanged: {}",
+                    categoryChanged,
+                    yearChanged
+            );
+
+
+            // =========================================================
+            // Update Category
+            // =========================================================
+
+            if (categoryChanged
+                    && documentHeader.getCategoryMaster() != null
+                    && documentHeader.getCategoryMaster().getId() != null) {
+
+                CategoryMaster categoryMaster =
+                        categoryMasterRepository.findById(
+                                documentHeader
+                                        .getCategoryMaster()
+                                        .getId()
+                        ).orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "CategoryMaster not found"
+                                )
+                        );
+
+                existingDocument.setCategoryMaster(
+                        categoryMaster
+                );
             }
 
+
+            // =========================================================
+            // Update Year
+            // =========================================================
+
             if (yearChanged && incomingYearId != null) {
-                YearMaster yearMaster = yearMasterRepository.findById(Math.toIntExact(incomingYearId))
-                        .orElseThrow(() -> new ResourceNotFoundException("YearMaster not found"));
-                for (DocumentDetails detail : existingDocument.getDocumentDetails()) {
+
+                YearMaster yearMaster =
+                        yearMasterRepository.findById(
+                                Math.toIntExact(incomingYearId)
+                        ).orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "YearMaster not found"
+                                )
+                        );
+
+                for (DocumentDetails detail :
+                        existingDocument.getDocumentDetails()) {
+
                     detail.setYearMaster(yearMaster);
                 }
             }
 
-            // 6️⃣ Update header fields
-            existingDocument.setUpdatedOn(Timestamp.from(Instant.now()));
-            existingDocument.setFileNo(documentHeader.getFileNo());
-            existingDocument.setTitle(documentHeader.getTitle());
-            existingDocument.setSubject(documentHeader.getSubject());
 
-            // Case Information
-            existingDocument.setFirNumber(documentHeader.getFirNumber());
-            existingDocument.setFirDate(documentHeader.getFirDate());
-            existingDocument.setCaseTypeId(documentHeader.getCaseTypeId());
-            existingDocument.setCrimeTypeId(documentHeader.getCrimeTypeId());
-            existingDocument.setStateId(documentHeader.getStateId());
-            existingDocument.setDistrictId(documentHeader.getDistrictId());
-            existingDocument.setCityId(documentHeader.getCityId());
-            existingDocument.setPoliceStation(documentHeader.getPoliceStation());
-            existingDocument.setInvestigatingOfficer(documentHeader.getInvestigatingOfficer());
-            existingDocument.setCourtReference(documentHeader.getCourtReference());
-            existingDocument.setPriorityId(documentHeader.getPriorityId());
-            existingDocument.setDateOfIncident(documentHeader.getDateOfIncident());
-            existingDocument.setIncidentLocation(documentHeader.getIncidentLocation());
+            // =========================================================
+            // 6. Update basic document fields
+            // =========================================================
 
-            // Evidence Metadata — evidenceId/exhibitNumber stay header-level;
-            // evidenceType/description now live per-file on document_details
-            // (synced inside documentDetailsService.updateFileDetails below)
-            existingDocument.setEvidenceId(documentHeader.getEvidenceId());
-            existingDocument.setExhibitNumber(documentHeader.getExhibitNumber());
-
-            // 7️⃣ Update files (including waiting room files)
-            List<DocumentDetails> updatedFiles = documentDetailsService.updateFileDetails(
-                    existingDocument.getCategoryMaster(),
-                    incomingYearId != null
-                            ? yearMasterRepository.findById(Math.toIntExact(incomingYearId)).orElse(null)
-                            : (existingDocument.getDocumentDetails() != null && !existingDocument.getDocumentDetails().isEmpty()
-                            ? existingDocument.getDocumentDetails().get(0).getYearMaster()
-                            : null),
-                    existingDocument,
-                    filePaths,
-                    version,
-                    categoryChanged || yearChanged
+            existingDocument.setUpdatedOn(
+                    Timestamp.from(Instant.now())
             );
 
-            existingDocument.setDocumentDetails(updatedFiles);
-            existingDocument.setApprovalStatus(DocApprovalStatus.PENDING);
+            existingDocument.setUpdatedBy(
+                    empObj.getEmail()
+            );
 
-            // 8️⃣ Save
-            DocumentHeader header = documentHeaderRepository.save(existingDocument);
-            msg.setMsg("Document updated successfully");
+            existingDocument.setFileNo(
+                    documentHeader.getFileNo()
+            );
 
-            // 🔹 METADATA UPDATE LOGIC
+            existingDocument.setTitle(
+                    documentHeader.getTitle()
+            );
+
+            existingDocument.setSubject(
+                    documentHeader.getSubject()
+            );
+
+
+            // =========================================================
+            // CASE INFORMATION
+            // =========================================================
+
+            existingDocument.setFirNumber(
+                    documentHeader.getFirNumber()
+            );
+
+            existingDocument.setFirDate(
+                    documentHeader.getFirDate()
+            );
+
+
+            // =========================================================
+            // CASE TYPE
+            // DocumentHeader has:
+            // private CaseTypeMaster caseType;
+            // =========================================================
+
+            if (documentHeader.getCaseType() != null
+                    && documentHeader.getCaseType().getId() != null) {
+
+                CaseTypeMaster caseType =
+                        caseTypeMasterRepository.findById(
+                                documentHeader.getCaseType().getId()
+                        ).orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "CaseTypeMaster not found with id "
+                                                + documentHeader
+                                                .getCaseType()
+                                                .getId()
+                                )
+                        );
+
+                existingDocument.setCaseType(caseType);
+            }
+
+
+            // =========================================================
+            // CRIME TYPE
+            // =========================================================
+
+            if (documentHeader.getCrimeType() != null
+                    && documentHeader.getCrimeType().getId() != null) {
+
+                CrimeTypeMaster crimeType =
+                        crimeTypeMasterRepository.findById(
+                                documentHeader.getCrimeType().getId()
+                        ).orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "CrimeTypeMaster not found with id "
+                                                + documentHeader
+                                                .getCrimeType()
+                                                .getId()
+                                )
+                        );
+
+                existingDocument.setCrimeType(crimeType);
+            }
+
+
+            // =========================================================
+            // STATE
+            // =========================================================
+
+            if (documentHeader.getState() != null
+                    && documentHeader.getState().getId() != null) {
+
+                StateMaster state =
+                        stateMasterRepository.findById(
+                                documentHeader.getState().getId()
+                        ).orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "StateMaster not found with id "
+                                                + documentHeader
+                                                .getState()
+                                                .getId()
+                                )
+                        );
+
+                existingDocument.setState(state);
+            }
+
+
+            // =========================================================
+            // DISTRICT
+            // =========================================================
+
+            if (documentHeader.getDistrict() != null
+                    && documentHeader.getDistrict().getId() != null) {
+
+                DistrictMaster district =
+                        districtMasterRepository.findById(
+                                documentHeader.getDistrict().getId()
+                        ).orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "DistrictMaster not found with id "
+                                                + documentHeader
+                                                .getDistrict()
+                                                .getId()
+                                )
+                        );
+
+                existingDocument.setDistrict(district);
+            }
+
+
+            // =========================================================
+            // CITY
+            // =========================================================
+
+            if (documentHeader.getCity() != null
+                    && documentHeader.getCity().getId() != null) {
+
+                CityMaster city =
+                        cityMasterRepository.findById(
+                                documentHeader.getCity().getId()
+                        ).orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "CityMaster not found with id "
+                                                + documentHeader
+                                                .getCity()
+                                                .getId()
+                                )
+                        );
+
+                existingDocument.setCity(city);
+            }
+
+
+            // =========================================================
+            // CASE DETAILS
+            // =========================================================
+
+            existingDocument.setPoliceStation(
+                    documentHeader.getPoliceStation()
+            );
+
+            existingDocument.setInvestigatingOfficer(
+                    documentHeader.getInvestigatingOfficer()
+            );
+
+            existingDocument.setCourtReference(
+                    documentHeader.getCourtReference()
+            );
+
+
+            // =========================================================
+            // PRIORITY
+            // =========================================================
+
+            if (documentHeader.getPriority() != null
+                    && documentHeader.getPriority().getId() != null) {
+
+                PriorityMaster priority =
+                        priorityMasterRepository.findById(
+                                documentHeader.getPriority().getId()
+                        ).orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "PriorityMaster not found with id "
+                                                + documentHeader
+                                                .getPriority()
+                                                .getId()
+                                )
+                        );
+
+                existingDocument.setPriority(priority);
+            }
+
+
+            // =========================================================
+            // INCIDENT INFORMATION
+            // =========================================================
+
+            existingDocument.setDateOfIncident(
+                    documentHeader.getDateOfIncident()
+            );
+
+            existingDocument.setIncidentLocation(
+                    documentHeader.getIncidentLocation()
+            );
+
+
+            // =========================================================
+            // EVIDENCE INFORMATION
+            // Header-level only
+            // =========================================================
+
+            existingDocument.setEvidenceId(
+                    documentHeader.getEvidenceId()
+            );
+
+            existingDocument.setExhibitNumber(
+                    documentHeader.getExhibitNumber()
+            );
+
+
+            // =========================================================
+            // 7. Update files
+            // =========================================================
+
+            YearMaster yearMasterForFiles = null;
+
+            if (incomingYearId != null) {
+
+                yearMasterForFiles =
+                        yearMasterRepository.findById(
+                                Math.toIntExact(incomingYearId)
+                        ).orElse(null);
+
+            } else if (existingDocument.getDocumentDetails() != null
+                    && !existingDocument.getDocumentDetails().isEmpty()) {
+
+                yearMasterForFiles =
+                        existingDocument
+                                .getDocumentDetails()
+                                .get(0)
+                                .getYearMaster();
+            }
+
+
+            List<DocumentDetails> updatedFiles =
+                    documentDetailsService.updateFileDetails(
+                            existingDocument.getCategoryMaster(),
+                            yearMasterForFiles,
+                            existingDocument,
+                            filePaths,
+                            version,
+                            categoryChanged || yearChanged
+                    );
+
+
+            existingDocument.setDocumentDetails(
+                    updatedFiles
+            );
+
+            existingDocument.setApprovalStatus(
+                    DocApprovalStatus.PENDING
+            );
+
+
+            // =========================================================
+            // 8. Save document
+            // =========================================================
+
+            DocumentHeader header =
+                    documentHeaderRepository.save(
+                            existingDocument
+                    );
+
+            msg.setMsg(
+                    "Document updated successfully"
+            );
+
+
+            // =========================================================
+            // METADATA UPDATE
+            // =========================================================
+
             if (metadata != null) {
-                log.debug("Processing {} metadata entries for update", metadata.size());
+
+                log.debug(
+                        "Processing {} metadata entries for update",
+                        metadata.size()
+                );
+
 
                 Map<Long, DocumentMetadata> existingMap =
-                        existingDocument.getMetadataList()
+                        existingDocument
+                                .getMetadataList()
                                 .stream()
                                 .filter(m -> m.getId() != null)
-                                .collect(Collectors.toMap(DocumentMetadata::getId, m -> m));
+                                .collect(
+                                        Collectors.toMap(
+                                                DocumentMetadata::getId,
+                                                m -> m
+                                        )
+                                );
 
-                List<DocumentMetadata> finalList = new ArrayList<>();
 
-                for (DocumentSaveRequest.MetadataRequest m : metadata) {
-                    if (m.getKey() == null || m.getKey().isBlank()) continue;
+                List<DocumentMetadata> finalList =
+                        new ArrayList<>();
 
-                    if (m.getId() > 0 && existingMap.containsKey(m.getId())) {
-                        // ✅ UPDATE existing metadata
-                        DocumentMetadata meta = existingMap.get(m.getId());
-                        meta.setMetaKey(m.getKey().trim());
-                        meta.setMetaValue(m.getValue());
+
+                for (DocumentSaveRequest.MetadataRequest m :
+                        metadata) {
+
+                    if (m.getKey() == null
+                            || m.getKey().isBlank()) {
+
+                        continue;
+                    }
+
+
+                    // Existing metadata
+                    if (m.getId() > 0
+                            && existingMap.containsKey(m.getId())) {
+
+                        DocumentMetadata meta =
+                                existingMap.get(m.getId());
+
+                        meta.setMetaKey(
+                                m.getKey().trim()
+                        );
+
+                        meta.setMetaValue(
+                                m.getValue()
+                        );
+
                         finalList.add(meta);
+
                     } else {
-                        // ✅ INSERT new metadata
-                        DocumentMetadata meta = new DocumentMetadata();
-                        meta.setDocumentHeader(existingDocument);
-                        meta.setMetaKey(m.getKey().trim());
-                        meta.setMetaValue(m.getValue());
-                        meta.setCreatedOn(new Timestamp(System.currentTimeMillis()));
+
+                        // New metadata
+                        DocumentMetadata meta =
+                                new DocumentMetadata();
+
+                        meta.setDocumentHeader(
+                                existingDocument
+                        );
+
+                        meta.setMetaKey(
+                                m.getKey().trim()
+                        );
+
+                        meta.setMetaValue(
+                                m.getValue()
+                        );
+
+                        meta.setCreatedOn(
+                                new Timestamp(
+                                        System.currentTimeMillis()
+                                )
+                        );
+
                         finalList.add(meta);
                     }
                 }
 
-                existingDocument.getMetadataList().clear();
-                existingDocument.getMetadataList().addAll(finalList);
+
+                existingDocument
+                        .getMetadataList()
+                        .clear();
+
+                existingDocument
+                        .getMetadataList()
+                        .addAll(finalList);
             }
 
-            if (deletedMetaDataIds != null && !deletedMetaDataIds.isEmpty()) {
-                log.debug("Deleting {} metadata entries", deletedMetaDataIds.size());
-                documentMetadataRepository.deleteAllById(deletedMetaDataIds);
+
+            // =========================================================
+            // DELETE METADATA
+            // =========================================================
+
+            if (deletedMetaDataIds != null
+                    && !deletedMetaDataIds.isEmpty()) {
+
+                log.debug(
+                        "Deleting {} metadata entries",
+                        deletedMetaDataIds.size()
+                );
+
+                documentMetadataRepository.deleteAllById(
+                        deletedMetaDataIds
+                );
             }
 
-            // 6️⃣.1️⃣ Update (or create, if it somehow never existed) Forwarding Authority Details
+
+            // =========================================================
+            // 6.1 Update/Create Forwarding Authority
+            // =========================================================
+
             if (forwardingAuthority != null) {
-                DocumentForwardingAuthority faEntity = forwardingAuthorityRepository
-                        .findByDocumentHeader_Id(existingDocument.getId())
-                        .orElseGet(() -> {
-                            DocumentForwardingAuthority fresh = new DocumentForwardingAuthority();
-                            fresh.setDocumentHeader(existingDocument);
-                            fresh.setCreatedBy(empObj.getEmail());
-                            fresh.setCreatedOn(Timestamp.from(Instant.now()));
-                            return fresh;
-                        });
 
-                // Set ForwardingAuthorityType entity
-                if (forwardingAuthority.getForwardingAuthorityTypeId() != null) {
-                    ForwardingAuthorityTypeMaster authorityType = forwardingAuthorityTypeRepository
-                            .findById(forwardingAuthority.getForwardingAuthorityTypeId())
-                            .orElse(null);
-                    faEntity.setForwardingAuthorityType(authorityType);
+                DocumentForwardingAuthority faEntity =
+                        forwardingAuthorityRepository
+                                .findByDocumentHeader_Id(
+                                        existingDocument.getId()
+                                )
+                                .orElseGet(() -> {
+
+                                    DocumentForwardingAuthority fresh =
+                                            new DocumentForwardingAuthority();
+
+                                    fresh.setDocumentHeader(
+                                            existingDocument
+                                    );
+
+                                    fresh.setCreatedBy(
+                                            empObj.getEmail()
+                                    );
+
+                                    fresh.setCreatedOn(
+                                            Timestamp.from(
+                                                    Instant.now()
+                                            )
+                                    );
+
+                                    return fresh;
+                                });
+
+
+                // =====================================================
+                // Forwarding Authority Type
+                // =====================================================
+
+                if (forwardingAuthority
+                        .getForwardingAuthorityTypeId() != null) {
+
+                    ForwardingAuthorityTypeMaster authorityType =
+                            forwardingAuthorityTypeRepository
+                                    .findById(
+                                            forwardingAuthority
+                                                    .getForwardingAuthorityTypeId()
+                                    )
+                                    .orElse(null);
+
+                    faEntity.setForwardingAuthorityType(
+                            authorityType
+                    );
                 }
 
-                faEntity.setAuthorityName(forwardingAuthority.getAuthorityName());
-                faEntity.setDesignation(forwardingAuthority.getDesignation());
-                faEntity.setOrganisation(forwardingAuthority.getOrganisation());
 
-                // Set District entity
+                faEntity.setAuthorityName(
+                        forwardingAuthority.getAuthorityName()
+                );
+
+                faEntity.setDesignation(
+                        forwardingAuthority.getDesignation()
+                );
+
+                faEntity.setOrganisation(
+                        forwardingAuthority.getOrganisation()
+                );
+
+
+                // =====================================================
+                // District
+                // =====================================================
+
                 if (forwardingAuthority.getDistrictId() != null) {
-                    DistrictMaster district = districtMasterRepository
-                            .findById(forwardingAuthority.getDistrictId())
-                            .orElse(null);
+
+                    DistrictMaster district =
+                            districtMasterRepository
+                                    .findById(
+                                            forwardingAuthority
+                                                    .getDistrictId()
+                                    )
+                                    .orElse(null);
+
                     faEntity.setDistrict(district);
                 }
 
-                // Set City entity
+
+                // =====================================================
+                // City
+                // =====================================================
+
                 if (forwardingAuthority.getCityId() != null) {
-                    CityMaster city = cityMasterRepository
-                            .findById(forwardingAuthority.getCityId())
-                            .orElse(null);
+
+                    CityMaster city =
+                            cityMasterRepository
+                                    .findById(
+                                            forwardingAuthority
+                                                    .getCityId()
+                                    )
+                                    .orElse(null);
+
                     faEntity.setCity(city);
                 }
 
-                faEntity.setAddress(forwardingAuthority.getAddress());
-                faEntity.setContactNumber(forwardingAuthority.getContactNumber());
-                faEntity.setEmail(forwardingAuthority.getEmail());
-                faEntity.setForwardingLetterNumber(forwardingAuthority.getForwardingLetterNumber());
-                faEntity.setForwardingDate(forwardingAuthority.getForwardingDate());
-                faEntity.setForwardingLetterPath(forwardingAuthority.getForwardingLetterPath());
 
-                // Set ModeOfSubmission entity
+                // =====================================================
+                // Address / Contact
+                // =====================================================
+
+                faEntity.setAddress(
+                        forwardingAuthority.getAddress()
+                );
+
+                faEntity.setContactNumber(
+                        forwardingAuthority.getContactNumber()
+                );
+
+                faEntity.setEmail(
+                        forwardingAuthority.getEmail()
+                );
+
+                faEntity.setForwardingLetterNumber(
+                        forwardingAuthority.getForwardingLetterNumber()
+                );
+
+                faEntity.setForwardingDate(
+                        forwardingAuthority.getForwardingDate()
+                );
+
+                faEntity.setForwardingLetterPath(
+                        forwardingAuthority.getForwardingLetterPath()
+                );
+
+
+                // =====================================================
+                // Mode Of Submission
+                // =====================================================
+
                 if (forwardingAuthority.getModeOfSubmissionId() != null) {
-                    ModeOfSubmissionMaster modeOfSubmission = modeOfSubmissionRepository
-                            .findById(forwardingAuthority.getModeOfSubmissionId())
-                            .orElse(null);
-                    faEntity.setModeOfSubmission(modeOfSubmission);
+
+                    ModeOfSubmissionMaster modeOfSubmission =
+                            modeOfSubmissionRepository
+                                    .findById(
+                                            forwardingAuthority
+                                                    .getModeOfSubmissionId()
+                                    )
+                                    .orElse(null);
+
+                    faEntity.setModeOfSubmission(
+                            modeOfSubmission
+                    );
                 }
 
-                faEntity.setCourierAgency(forwardingAuthority.getCourierAgency());
-                faEntity.setAwbConsignmentNumber(forwardingAuthority.getAwbConsignmentNumber());
-                faEntity.setBookingDate(forwardingAuthority.getBookingDate());
-                faEntity.setDispatchDate(forwardingAuthority.getDispatchDate());
-                faEntity.setExpectedDeliveryDate(forwardingAuthority.getExpectedDeliveryDate());
-                faEntity.setActualDeliveryDate(forwardingAuthority.getActualDeliveryDate());
-                faEntity.setParcelId(forwardingAuthority.getParcelId());
-                faEntity.setParcelNumber(forwardingAuthority.getParcelNumber());
-                faEntity.setNumberOfExhibits(forwardingAuthority.getNumberOfExhibits());
 
-                // Set PackageType entity
+                // =====================================================
+                // Courier / Dispatch
+                // =====================================================
+
+                faEntity.setCourierAgency(
+                        forwardingAuthority.getCourierAgency()
+                );
+
+                faEntity.setAwbConsignmentNumber(
+                        forwardingAuthority.getAwbConsignmentNumber()
+                );
+
+                faEntity.setBookingDate(
+                        forwardingAuthority.getBookingDate()
+                );
+
+                faEntity.setDispatchDate(
+                        forwardingAuthority.getDispatchDate()
+                );
+
+                faEntity.setExpectedDeliveryDate(
+                        forwardingAuthority.getExpectedDeliveryDate()
+                );
+
+                faEntity.setActualDeliveryDate(
+                        forwardingAuthority.getActualDeliveryDate()
+                );
+
+                faEntity.setParcelId(
+                        forwardingAuthority.getParcelId()
+                );
+
+                faEntity.setParcelNumber(
+                        forwardingAuthority.getParcelNumber()
+                );
+
+                faEntity.setNumberOfExhibits(
+                        forwardingAuthority.getNumberOfExhibits()
+                );
+
+
+                // =====================================================
+                // Package Type
+                // =====================================================
+
                 if (forwardingAuthority.getPackageTypeId() != null) {
-                    PackageTypeMaster packageType = packageTypeRepository
-                            .findById(forwardingAuthority.getPackageTypeId())
-                            .orElse(null);
-                    faEntity.setPackageType(packageType);
+
+                    PackageTypeMaster packageType =
+                            packageTypeRepository
+                                    .findById(
+                                            forwardingAuthority
+                                                    .getPackageTypeId()
+                                    )
+                                    .orElse(null);
+
+                    faEntity.setPackageType(
+                            packageType
+                    );
                 }
 
-                faEntity.setSealNumber(forwardingAuthority.getSealNumber());
-                faEntity.setSealDescription(forwardingAuthority.getSealDescription());
-                faEntity.setSealCondition(forwardingAuthority.getSealCondition());
-                faEntity.setPackageCondition(forwardingAuthority.getPackageCondition());
-                faEntity.setReceivedDate(forwardingAuthority.getReceivedDate());
-                faEntity.setReceivedTime(forwardingAuthority.getReceivedTime());
-                faEntity.setReceivedBy(forwardingAuthority.getReceivedBy());
-                faEntity.setRemarks(forwardingAuthority.getRemarks());
-                faEntity.setUpdatedBy(empObj.getEmail());
-                faEntity.setUpdatedOn(Timestamp.from(Instant.now()));
 
-                forwardingAuthorityRepository.save(faEntity);
-                log.debug("Updated Forwarding Authority Details for document {}", existingDocument.getId());
+                // =====================================================
+                // Seal / Package Information
+                // =====================================================
+
+                faEntity.setSealNumber(
+                        forwardingAuthority.getSealNumber()
+                );
+
+                faEntity.setSealDescription(
+                        forwardingAuthority.getSealDescription()
+                );
+
+                faEntity.setSealCondition(
+                        forwardingAuthority.getSealCondition()
+                );
+
+                faEntity.setPackageCondition(
+                        forwardingAuthority.getPackageCondition()
+                );
+
+                faEntity.setReceivedDate(
+                        forwardingAuthority.getReceivedDate()
+                );
+
+                faEntity.setReceivedTime(
+                        forwardingAuthority.getReceivedTime()
+                );
+
+                faEntity.setReceivedBy(
+                        forwardingAuthority.getReceivedBy()
+                );
+
+                faEntity.setRemarks(
+                        forwardingAuthority.getRemarks()
+                );
+
+
+                // =====================================================
+                // Audit
+                // =====================================================
+
+                faEntity.setUpdatedBy(
+                        empObj.getEmail()
+                );
+
+                faEntity.setUpdatedOn(
+                        Timestamp.from(Instant.now())
+                );
+
+
+                forwardingAuthorityRepository.save(
+                        faEntity
+                );
+
+                log.debug(
+                        "Updated Forwarding Authority Details for document {}",
+                        existingDocument.getId()
+                );
             }
 
-            docHeaderStatusService.recalcAndUpdateHeaderStatus(header, empObj.getEmail());
 
-            // 9️⃣ Update waiting room status to MOVED for new waiting room files
+            // =========================================================
+            // Recalculate Header Status
+            // =========================================================
+
+            docHeaderStatusService.recalcAndUpdateHeaderStatus(
+                    header,
+                    empObj.getEmail()
+            );
+
+
+            // =========================================================
+            // 9. Update waiting room status to MOVED
+            // =========================================================
+
             if (!waitingRoomIdsInRequest.isEmpty()) {
-                waitingRoomScheduler.updateStatusToMoved(waitingRoomIdsInRequest);
-                log.info("Updated {} waiting room files to MOVED status during update", waitingRoomIdsInRequest.size());
+
+                waitingRoomScheduler.updateStatusToMoved(
+                        waitingRoomIdsInRequest
+                );
+
+                log.info(
+                        "Updated {} waiting room files to MOVED status during update",
+                        waitingRoomIdsInRequest.size()
+                );
             }
 
-            // ✅ Clear rollback list on success
+
+            // =========================================================
+            // Clear rollback list on success
+            // =========================================================
+
             waitingRoomIdsToRollback.clear();
 
-            // 🔟 Success audit log
-            for (DocumentDetailsResponse prevFile : previousFileDetails) {
-                Map<String, Object> detailsJson = Map.of(
-                        "title", previousDocData.get("title"),
-                        "subject", previousDocData.get("subject"),
-                        "category", previousDocData.get("category"),
-                        "year", previousDocData.get("year"),
-                        "version", prevFile.getVersion(),
-                        "fileName", prevFile.getDocName()
-                );
+
+            // =========================================================
+            // 10. Success audit log
+            // =========================================================
+
+            for (DocumentDetailsResponse prevFile :
+                    previousFileDetails) {
+
+                Map<String, Object> detailsJson =
+                        Map.of(
+                                "title",
+                                previousDocData.get("title"),
+
+                                "subject",
+                                previousDocData.get("subject"),
+
+                                "category",
+                                previousDocData.get("category"),
+
+                                "year",
+                                previousDocData.get("year"),
+
+                                "version",
+                                prevFile.getVersion(),
+
+                                "fileName",
+                                prevFile.getDocName()
+                        );
+
 
                 auditLogUtil.logDocumentAction(
                         empObj,
@@ -798,22 +1490,59 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                 );
             }
 
-            log.info("SUCCESS → Document Updated | id={} caseId={} title={}",
-                    existingDocument.getId(), existingDocument.getCaseId(), existingDocument.getTitle());
 
-            return ResponseUtils.createSuccessResponse(msg, new TypeReference<>() {});
+            // =========================================================
+            // SUCCESS
+            // =========================================================
+
+            log.info(
+                    "SUCCESS → Document Updated | id={} caseId={} title={}",
+                    existingDocument.getId(),
+                    existingDocument.getCaseId(),
+                    existingDocument.getTitle()
+            );
+
+
+            return ResponseUtils.createSuccessResponse(
+                    msg,
+                    new TypeReference<>() {}
+            );
+
 
         } catch (Exception ex) {
-            log.error("FAILED → Update Document With Files | documentId={} reason={}",
-                    documentHeader.getId(), ex.getMessage(), ex);
 
-            msg.setMsg("Document update failed");
+            log.error(
+                    "FAILED → Update Document With Files | documentId={} reason={}",
+                    documentHeader.getId(),
+                    ex.getMessage(),
+                    ex
+            );
 
-            // ❌ Rollback: Update waiting room status to FAILED
+            msg.setMsg(
+                    "Document update failed"
+            );
+
+
+            // =========================================================
+            // Rollback waiting room
+            // =========================================================
+
             if (!waitingRoomIdsToRollback.isEmpty()) {
-                log.info("🔄 Rolling back {} waiting room files due to update failure", waitingRoomIdsToRollback.size());
-                waitingRoomScheduler.updateStatusToFailed(waitingRoomIdsToRollback);
+
+                log.info(
+                        "🔄 Rolling back {} waiting room files due to update failure",
+                        waitingRoomIdsToRollback.size()
+                );
+
+                waitingRoomScheduler.updateStatusToFailed(
+                        waitingRoomIdsToRollback
+                );
             }
+
+
+            // =========================================================
+            // Failure audit
+            // =========================================================
 
             auditLogUtil.logDocumentAction(
                     empObj,
@@ -822,9 +1551,13 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                     "Failure",
                     documentHeader.getId(),
                     null,
-                    Map.of("error", ex.getMessage()),
+                    Map.of(
+                            "error",
+                            ex.getMessage()
+                    ),
                     request
             );
+
 
             return ResponseUtils.createFailureResponse(
                     msg,

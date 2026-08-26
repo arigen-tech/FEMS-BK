@@ -182,6 +182,47 @@ public class DocumentDetails {
     @Column(name = "assignment_remark")
     private String assignmentRemark;
 
+    // ───── Review / Referral Fields (evidence-level review) ─────
+    @Column(name = "review_status")
+    private String reviewStatus = "PENDING"; // PENDING, APPROVED, REJECTED, REFERRED
+
+    @Column(name = "reviewed_by")
+    private Integer reviewedBy;
+
+    @Column(name = "reviewed_on")
+    private Timestamp reviewedOn;
+
+    @Lob
+    @Column(name = "review_comments")
+    private String reviewComments;
+
+    @Column(name = "final_report_path")
+    private String finalReportPath;
+
+    @Column(name = "referral_status")
+    private String referralStatus;
+
+    @Column(name = "referred_to_lab")
+    private String referredToLab;
+
+    @Column(name = "referred_from_lab")
+    private String referredFromLab;
+
+    @Column(name = "referred_on")
+    private Timestamp referredOn;
+
+    @Lob
+    @Column(name = "referral_reason")
+    private String referralReason;
+
+    // ───── Review / Referral Fields (evidence-level review) ─────
+
+    @Column(name = "referral_accepted_by")
+    private Integer referralAcceptedBy;
+
+    @Column(name = "referral_accepted_on")
+    private Timestamp referralAcceptedOn;
+
 
 
 

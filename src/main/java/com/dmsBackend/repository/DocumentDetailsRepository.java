@@ -282,5 +282,18 @@ public interface DocumentDetailsRepository extends JpaRepository<DocumentDetails
             @Param("yearId") Integer yearId
     );
 
+    List<DocumentDetails> findByEmpId_Id(Integer employeeId);
+
+    // Add this method to your DocumentDetailsRepository interface
+    @Query("SELECT d FROM DocumentDetails d WHERE d.empId.id = :employeeId AND d.documentHeader.id = :headerId AND d.isDeleted = false")
+    List<DocumentDetails> findAssignedEvidenceForHeader(
+            @Param("employeeId") Integer employeeId,
+            @Param("headerId") Integer headerId
+    );
+
+    List<DocumentDetails> findByDocumentHeader_IdAndIsDeletedFalse(Integer documentHeaderId);
+
+    List<DocumentDetails> findByReferredFromLab(String referredFromLab);
+    List<DocumentDetails> findByReferredToLabAndReferralStatus(String referredToLab, String referralStatus);
 }
 

@@ -1,5 +1,6 @@
 package com.dmsBackend.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
@@ -32,16 +33,24 @@ import java.util.List;
         "language",
         "profileImage",
         "role",
-        "hibernateLazyInitializer", "handler"
+        "hibernateLazyInitializer",
+        "handler"
 })
 public class DocumentHeader {
 
-    // ───── Primary Key ─────
+    // =========================================================
+    // PRIMARY KEY
+    // =========================================================
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    // ───── Core Document Info ─────
+
+    // =========================================================
+    // CORE DOCUMENT INFORMATION
+    // =========================================================
+
     @Column(name = "doc_title", nullable = false)
     private String title;
 
@@ -51,7 +60,11 @@ public class DocumentHeader {
     @Column(name = "doc_sub", nullable = false)
     private String subject;
 
-    // ------------ approval flag --------------
+
+    // =========================================================
+    // APPROVAL FLAGS
+    // =========================================================
+
     @Column(name = "if_approved")
     private Boolean ifApproved = false;
 
@@ -64,30 +77,60 @@ public class DocumentHeader {
     @Column(name = "if_external")
     private Boolean externalApiFlag = false;
 
-    // ───── Relations ─────
+
+    // =========================================================
+    // BASIC MASTER RELATIONS
+    // =========================================================
+
     @ManyToOne
 //    @JsonIgnore
     @JoinColumn(name = "category_id", referencedColumnName = "id")
     private CategoryMaster categoryMaster;
 
+
     @ManyToOne
-//    @JsonIgnore
-    @JoinColumn(name = "branch_id", referencedColumnName = "id", nullable = false)
+    @JoinColumn(
+            name = "branch_id",
+            referencedColumnName = "id",
+            nullable = false
+    )
     private BranchMaster branchMaster;
 
+
     @ManyToOne
-//    @JsonIgnore
-    @JoinColumn(name = "department_id", referencedColumnName = "id", nullable = false)
+    @JoinColumn(
+            name = "department_id",
+            referencedColumnName = "id",
+            nullable = false
+    )
     private DepartmentMaster departmentMaster;
 
+
     @ManyToOne
-//    @JsonIgnore
-    @JoinColumn(name = "employee_id", referencedColumnName = "id", nullable = false)
+    @JoinColumn(
+            name = "employee_id",
+            referencedColumnName = "id",
+            nullable = false
+    )
     private Employee employee;
 
-    @OneToMany(mappedBy = "documentHeader", fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+
+    // =========================================================
+    // DOCUMENT DETAILS
+    // =========================================================
+
+    @OneToMany(
+            mappedBy = "documentHeader",
+            fetch = FetchType.EAGER,
+            cascade = CascadeType.ALL
+    )
     @JsonManagedReference
-    private List<DocumentDetails> documentDetails;
+    private List<DocumentDetails> documentDetails = new ArrayList<>();
+
+
+    // =========================================================
+    // DOCUMENT METADATA
+    // =========================================================
 
     @OneToMany(
             mappedBy = "documentHeader",
@@ -99,14 +142,27 @@ public class DocumentHeader {
     private List<DocumentMetadata> metadataList = new ArrayList<>();
 
 
+    // =========================================================
+    // APPROVAL INFORMATION
+    // =========================================================
 
-    // ───── Approval Info ─────
     @Enumerated(EnumType.STRING)
-    @Column(name = "approval_status", nullable = false)
+    @Column(
+            name = "approval_status",
+            nullable = false
+    )
     private DocApprovalStatus approvalStatus = DocApprovalStatus.PENDING;
 
-    // ───── Audit Fields ─────
-    @Column(name = "created_on", nullable = false, updatable = false)
+
+    // =========================================================
+    // AUDIT INFORMATION
+    // =========================================================
+
+    @Column(
+            name = "created_on",
+            nullable = false,
+            updatable = false
+    )
     private Timestamp createdOn;
 
     @Column(name = "created_by")
@@ -118,7 +174,11 @@ public class DocumentHeader {
     @Column(name = "updated_by")
     private String updatedBy;
 
-    // ───── QR & Active Flag ─────
+
+    // =========================================================
+    // QR & ACTIVE FLAG
+    // =========================================================
+
     @Column(name = "qr_path")
     private String qrPath;
 
@@ -126,8 +186,10 @@ public class DocumentHeader {
     private boolean active;
 
 
+    // =========================================================
+    // LTO STATUS
+    // =========================================================
 
-    // LTO Status Fields
     @Column(name = "lto_archived")
     private Boolean ltoArchived = false;
 
@@ -141,13 +203,16 @@ public class DocumentHeader {
     private String ltoTapeBarcode;
 
     @Column(name = "lto_status")
-    private String ltoStatus = "PENDING"; // PENDING, ARCHIVING, ARCHIVED, FAILED
+    private String ltoStatus = "PENDING";
 
     @Column(name = "lto_error")
     private String ltoError;
 
 
-    // ───── Case Information (Register Case & Evidence) ─────
+    // =========================================================
+    // CASE INFORMATION
+    // =========================================================
+
     @Column(name = "case_id")
     private String caseId;
 
@@ -157,20 +222,70 @@ public class DocumentHeader {
     @Column(name = "fir_date")
     private Timestamp firDate;
 
-    @Column(name = "case_type_id")
-    private Integer caseTypeId;
 
-    @Column(name = "crime_type_id")
-    private Integer crimeTypeId;
+    // =========================================================
+    // CASE TYPE MASTER
+    // =========================================================
 
-    @Column(name = "state_id")
-    private Integer stateId;
+    @ManyToOne
+    @JoinColumn(
+            name = "case_type_id",
+            referencedColumnName = "id"
+    )
+    private CaseTypeMaster caseType;
 
-    @Column(name = "district_id")
-    private Integer districtId;
 
-    @Column(name = "city_id")
-    private Integer cityId;
+    // =========================================================
+    // CRIME TYPE MASTER
+    // =========================================================
+
+    @ManyToOne
+    @JoinColumn(
+            name = "crime_type_id",
+            referencedColumnName = "id"
+    )
+    private CrimeTypeMaster crimeType;
+
+
+    // =========================================================
+    // STATE MASTER
+    // =========================================================
+
+    @ManyToOne
+    @JoinColumn(
+            name = "state_id",
+            referencedColumnName = "id"
+    )
+    private StateMaster state;
+
+
+    // =========================================================
+    // DISTRICT MASTER
+    // =========================================================
+
+    @ManyToOne
+    @JoinColumn(
+            name = "district_id",
+            referencedColumnName = "id"
+    )
+    private DistrictMaster district;
+
+
+    // =========================================================
+    // CITY MASTER
+    // =========================================================
+
+    @ManyToOne
+    @JoinColumn(
+            name = "city_id",
+            referencedColumnName = "id"
+    )
+    private CityMaster city;
+
+
+    // =========================================================
+    // CASE DETAILS
+    // =========================================================
 
     @Column(name = "police_station")
     private String policeStation;
@@ -181,17 +296,35 @@ public class DocumentHeader {
     @Column(name = "court_reference")
     private String courtReference;
 
-    @Column(name = "priority_id")
-    private Integer priorityId;
+
+    // =========================================================
+    // PRIORITY MASTER
+    // =========================================================
+
+    @ManyToOne
+    @JoinColumn(
+            name = "priority_id",
+            referencedColumnName = "id"
+    )
+    private PriorityMaster priority;
+
 
     @Column(name = "date_of_incident")
     private Timestamp dateOfIncident;
 
-    @Column(name = "incident_location", length = 500)
+    @Column(
+            name = "incident_location",
+            length = 500
+    )
     private String incidentLocation;
 
 
-    // ───── Evidence Metadata (header-level only; type/description moved to document_details) ─────
+    // =========================================================
+    // EVIDENCE INFORMATION
+    // Header-level only
+    // Evidence type/description are in DocumentDetails
+    // =========================================================
+
     @Column(name = "evidence_id")
     private String evidenceId;
 
@@ -199,11 +332,13 @@ public class DocumentHeader {
     private String exhibitNumber;
 
 
-    // ───── Approval tracking (already existed in DB, was missing from the entity) ─────
+    // =========================================================
+    // APPROVAL TRACKING
+    // =========================================================
+
     @Column(name = "approval_status_by")
     private String approvalStatusBy;
 
     @Column(name = "approval_status_on")
     private Timestamp approvalStatusOn;
-
 }

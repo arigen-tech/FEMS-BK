@@ -1486,4 +1486,54 @@ public class DocumentController {
                     ));
         }
     }
+
+
+
+    @GetMapping("/download-by-path")
+    public ResponseEntity<Resource> downloadByPath(
+            @RequestParam String path,
+            @RequestParam(defaultValue = "download") String action) {
+
+        try {
+            // Decode the path (Spring handles URL decoding automatically)
+            String filePath = path;
+
+            // Convert forward slashes back to backslashes for Windows
+            if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                filePath = filePath.replace("/", "\\");
+            }
+
+            Path file = Paths.get(filePath);
+
+            if (!Files.exists(file)) {
+                return ResponseEntity.notFound().build();
+            }
+
+            Resource resource = new FileSystemResource(file);
+
+            // Determine content type
+            String contentType = Files.probeContentType(file);
+            if (contentType == null) {
+                contentType = "application/octet-stream";
+            }
+
+            if ("view".equalsIgnoreCase(action)) {
+                return ResponseEntity.ok()
+                        .contentType(MediaType.parseMediaType(contentType))
+                        .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + file.getFileName() + "\"")
+                        .body(resource);
+            } else {
+                return ResponseEntity.ok()
+                        .contentType(MediaType.parseMediaType(contentType))
+                        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.getFileName() + "\"")
+                        .body(resource);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+
 }

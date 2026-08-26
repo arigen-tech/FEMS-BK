@@ -19,6 +19,8 @@ public enum MasterType {
     PURPOSE("purpose", "purposeMasterService"),
     NATURE_OF_EXAMINATION("nature-of-examination", "natureOfExaminationMasterService"),
     SEAL_STATUS("seal-status", "sealStatusMasterService"),
+    EXAMINATION_METHOD("examination-method", "examinationMethodMasterService"),
+
     PARCEL_CONDITION("parcel-condition", "parcelConditionMasterService");
 
     private final String key;

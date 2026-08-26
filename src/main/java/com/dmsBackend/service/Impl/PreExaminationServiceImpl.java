@@ -238,8 +238,8 @@ public class PreExaminationServiceImpl implements PreExaminationService {
         resp.setCaseStatus(header.getApprovalStatus() != null ? header.getApprovalStatus().name() : null);
 
         // Priority Name
-        if (header.getPriorityId() != null) {
-            priorityMasterRepository.findById(header.getPriorityId())
+        if (header.getPriority() != null) {
+            priorityMasterRepository.findById(header.getPriority().getId())
                     .ifPresent(priority -> resp.setPriorityName(priority.getName()));
         }
 
