@@ -108,6 +108,41 @@ public class ReportEntry {
     @Column(name = "referred_from_lab")
     private String referredFromLab;
 
+    // ───── Dispatch Fields ─────
+    @Column(name = "dispatch_status")
+    private String dispatchStatus; // PENDING, DISPATCHED
+
+    @Column(name = "dispatch_date")
+    private Date dispatchDate;
+
+    @Column(name = "dispatch_reference_no")
+    private String dispatchReferenceNo;
+
+    @Column(name = "recipient")
+    private String recipient;
+
+    @Column(name = "dispatch_mode")
+    private String dispatchMode;
+
+    @Column(name = "dispatch_document_path")
+    private String dispatchDocumentPath;
+
+    @Lob
+    @Column(name = "dispatch_remarks")
+    private String dispatchRemarks;
+
+    @Column(name = "notify_email")
+    private Boolean notifyEmail = false;
+
+    @Column(name = "notify_sms")
+    private Boolean notifySms = false;
+
+    @Column(name = "dispatched_by")
+    private Integer dispatchedBy;
+
+    @Column(name = "dispatched_on")
+    private Timestamp dispatchedOn;
+
     @OneToMany(mappedBy = "reportEntry", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     private List<ReportEntryAttachment> attachments = new ArrayList<>();
 

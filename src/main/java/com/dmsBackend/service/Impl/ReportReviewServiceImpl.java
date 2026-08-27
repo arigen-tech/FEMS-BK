@@ -60,13 +60,18 @@ public class ReportReviewServiceImpl implements ReportReviewService {
         List<ReportReviewListItem> result = new ArrayList<>();
 
         for (ReportEntry report : pendingReports) {
-            if (report.getReviewStatus() != null &&
-                    !report.getReviewStatus().equals("PENDING") &&
-                    !report.getReviewStatus().isEmpty() &&
-                    !report.getReviewStatus().equals("APPROVED") &&
-                    !report.getReviewStatus().equals("REJECTED") &&
-                    !report.getReviewStatus().equals("REFERRED")) {
-                log.info("Skipping report {} with reviewStatus={}", report.getId(), report.getReviewStatus());
+            String reviewStatus = report.getReviewStatus();
+
+            // Only reports still awaiting action belong in this queue.
+            // APPROVED reports move to Dispatch; REJECTED reports go back to the
+            // officer as a DRAFT and reappear here once resubmitted as PENDING.
+            boolean stillPending = reviewStatus == null
+                    || reviewStatus.isEmpty()
+                    || reviewStatus.equals("PENDING")
+                    || reviewStatus.equals("REFERRED");
+
+            if (!stillPending) {
+                log.info("Skipping report {} with reviewStatus={}", report.getId(), reviewStatus);
                 continue;
             }
 
@@ -93,7 +98,7 @@ public class ReportReviewServiceImpl implements ReportReviewService {
 
             item.setReportTitle(report.getReportTitle());
             item.setSubmittedDate(report.getSubmittedOn());
-            item.setReviewStatus(report.getReviewStatus() != null ? report.getReviewStatus() : "PENDING");
+            item.setReviewStatus(reviewStatus != null ? reviewStatus : "PENDING");
 
             if (report.getDocumentHeader() != null && report.getDocumentHeader().getDocumentDetails() != null) {
                 item.setEvidenceCount(report.getDocumentHeader().getDocumentDetails().size());
@@ -252,6 +257,9 @@ public class ReportReviewServiceImpl implements ReportReviewService {
             Timestamp now = new Timestamp(System.currentTimeMillis());
 
             report.setReviewStatus(newStatus);
+            if ("APPROVE".equalsIgnoreCase(action)) {
+                report.setDispatchStatus("PENDING");
+            }
             report.setReviewedBy(me.getId());
             report.setReviewedOn(now);
             report.setReviewComments(comments);

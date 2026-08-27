@@ -18,8 +18,7 @@ public class PreExaminationCaseResponse {
     private String incidentLocation;
     private String priorityName;
     private String caseStatus;
-
-    // Forwarding Authority (Read Only)
+    private Boolean isReferralCase = false;
     private ForwardingAuthority forwardingAuthority;
 
     // Evidence List

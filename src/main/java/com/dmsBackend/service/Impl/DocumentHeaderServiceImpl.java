@@ -237,6 +237,54 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                 header.setCategoryMaster(category);
             }
 
+            // 1️⃣.2️⃣ Resolve full Case Type
+            if (header.getCaseType() != null && header.getCaseType().getId() != null) {
+                CaseTypeMaster caseType = caseTypeMasterRepository.findById(header.getCaseType().getId())
+                        .orElseThrow(() -> {
+                            log.error("FAILED → Save Document | reason=CaseType Not Found | caseTypeId={}", header.getCaseType().getId());
+                            return new ResourceNotFoundException("CaseTypeMaster not found with id " + header.getCaseType().getId());
+                        });
+                header.setCaseType(caseType);
+            }
+
+            // 1️⃣.3️⃣ Resolve full Crime Type
+            if (header.getCrimeType() != null && header.getCrimeType().getId() != null) {
+                CrimeTypeMaster crimeType = crimeTypeMasterRepository.findById(header.getCrimeType().getId())
+                        .orElseThrow(() -> {
+                            log.error("FAILED → Save Document | reason=CrimeType Not Found | crimeTypeId={}", header.getCrimeType().getId());
+                            return new ResourceNotFoundException("CrimeTypeMaster not found with id " + header.getCrimeType().getId());
+                        });
+                header.setCrimeType(crimeType);
+            }
+
+            // 1️⃣.4️⃣ Resolve full State
+            if (header.getState() != null && header.getState().getId() != null) {
+                StateMaster state = stateMasterRepository.findById(header.getState().getId())
+                        .orElseThrow(() -> new ResourceNotFoundException("StateMaster not found with id " + header.getState().getId()));
+                header.setState(state);
+            }
+
+            // 1️⃣.5️⃣ Resolve full District
+            if (header.getDistrict() != null && header.getDistrict().getId() != null) {
+                DistrictMaster district = districtMasterRepository.findById(header.getDistrict().getId())
+                        .orElseThrow(() -> new ResourceNotFoundException("DistrictMaster not found with id " + header.getDistrict().getId()));
+                header.setDistrict(district);
+            }
+
+            // 1️⃣.6️⃣ Resolve full City
+            if (header.getCity() != null && header.getCity().getId() != null) {
+                CityMaster city = cityMasterRepository.findById(header.getCity().getId())
+                        .orElseThrow(() -> new ResourceNotFoundException("CityMaster not found with id " + header.getCity().getId()));
+                header.setCity(city);
+            }
+
+            // 1️⃣.7️⃣ Resolve full Priority
+            if (header.getPriority() != null && header.getPriority().getId() != null) {
+                PriorityMaster priority = priorityMasterRepository.findById(header.getPriority().getId())
+                        .orElseThrow(() -> new ResourceNotFoundException("PriorityMaster not found with id " + header.getPriority().getId()));
+                header.setPriority(priority);
+            }
+
             // 2️⃣ Extract waiting room IDs from file paths
             List<Integer> waitingRoomIdsInRequest = req.getFilePaths().stream()
                     .filter(fp -> fp.getWaitingRoomId() != null)
@@ -297,7 +345,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                 DocumentForwardingAuthority forwardingAuthority = new DocumentForwardingAuthority();
                 forwardingAuthority.setDocumentHeader(savedHeader);
 
-                // Set ForwardingAuthorityType entity
                 if (fa.getForwardingAuthorityTypeId() != null) {
                     ForwardingAuthorityTypeMaster authorityType = forwardingAuthorityTypeRepository
                             .findById(fa.getForwardingAuthorityTypeId())
@@ -309,7 +356,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                 forwardingAuthority.setDesignation(fa.getDesignation());
                 forwardingAuthority.setOrganisation(fa.getOrganisation());
 
-                // Set District entity
                 if (fa.getDistrictId() != null) {
                     DistrictMaster district = districtMasterRepository
                             .findById(fa.getDistrictId())
@@ -317,7 +363,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                     forwardingAuthority.setDistrict(district);
                 }
 
-                // Set City entity
                 if (fa.getCityId() != null) {
                     CityMaster city = cityMasterRepository
                             .findById(fa.getCityId())
@@ -332,7 +377,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                 forwardingAuthority.setForwardingDate(fa.getForwardingDate());
                 forwardingAuthority.setForwardingLetterPath(fa.getForwardingLetterPath());
 
-                // Set ModeOfSubmission entity
                 if (fa.getModeOfSubmissionId() != null) {
                     ModeOfSubmissionMaster modeOfSubmission = modeOfSubmissionRepository
                             .findById(fa.getModeOfSubmissionId())
@@ -350,7 +394,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                 forwardingAuthority.setParcelNumber(fa.getParcelNumber());
                 forwardingAuthority.setNumberOfExhibits(fa.getNumberOfExhibits());
 
-                // Set PackageType entity
                 if (fa.getPackageTypeId() != null) {
                     PackageTypeMaster packageType = packageTypeRepository
                             .findById(fa.getPackageTypeId())
@@ -467,7 +510,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
         } catch (Exception e) {
             log.error("FAILED → Save Document With Files | reason={}", e.getMessage(), e);
 
-            // ❌ Rollback: Update waiting room status to FAILED for files that were moved but save failed
             if (!waitingRoomIdsToRollback.isEmpty()) {
                 log.info("Rolling back {} waiting room files due to save failure", waitingRoomIdsToRollback.size());
                 waitingRoomScheduler.updateStatusToFailed(waitingRoomIdsToRollback);
@@ -481,7 +523,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
 
         return api;
     }
-
     @Transactional
     @Override
     public ApiResponse<MessageResponse> updateDocumentWithFiles(

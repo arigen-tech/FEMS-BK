@@ -295,5 +295,8 @@ public interface DocumentDetailsRepository extends JpaRepository<DocumentDetails
 
     List<DocumentDetails> findByReferredFromLab(String referredFromLab);
     List<DocumentDetails> findByReferredToLabAndReferralStatus(String referredToLab, String referralStatus);
+
+
+    List<DocumentDetails> findByDocumentHeader_Id(Integer documentHeaderId);
 }
 
