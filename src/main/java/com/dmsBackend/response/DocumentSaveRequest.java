@@ -206,6 +206,12 @@ public class DocumentSaveRequest {
         private String receivedTime;
         private String receivedBy;
         private String remarks;
+
+        private String messengerName;
+        private String messengerDesignation;
+        private String messengerOrganization;
+        private String messengerIdRef;
+        private Timestamp handoverDateTime;
     }
 
 }

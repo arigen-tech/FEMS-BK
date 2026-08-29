@@ -341,4 +341,15 @@ public class DocumentHeader {
 
     @Column(name = "approval_status_on")
     private Timestamp approvalStatusOn;
+
+    @Transient
+    private DocumentForwardingAuthority forwardingAuthority;
+
+    public DocumentForwardingAuthority getForwardingAuthority() {
+        return forwardingAuthority;
+    }
+
+    public void setForwardingAuthority(DocumentForwardingAuthority forwardingAuthority) {
+        this.forwardingAuthority = forwardingAuthority;
+    }
 }

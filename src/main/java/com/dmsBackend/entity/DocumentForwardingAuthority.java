@@ -1,5 +1,6 @@
 package com.dmsBackend.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -16,6 +17,7 @@ public class DocumentForwardingAuthority {
     private Integer id;
 
     @ManyToOne
+    @JsonIgnore
     @JoinColumn(name = "document_header_id", referencedColumnName = "id", nullable = false)
     private DocumentHeader documentHeader;
 
@@ -129,6 +131,25 @@ public class DocumentForwardingAuthority {
 
     @Column(name = "updated_on")
     private Timestamp updatedOn;
+
+    // =========================================================
+    // MESSENGER / HANDOVER DETAILS
+    // =========================================================
+
+    @Column(name = "messenger_name")
+    private String messengerName;
+
+    @Column(name = "messenger_designation")
+    private String messengerDesignation;
+
+    @Column(name = "messenger_organization")
+    private String messengerOrganization;
+
+    @Column(name = "messenger_id_ref")
+    private String messengerIdRef;
+
+    @Column(name = "handover_date_time")
+    private Timestamp handoverDateTime;
 
     @PrePersist
     protected void onCreate() {

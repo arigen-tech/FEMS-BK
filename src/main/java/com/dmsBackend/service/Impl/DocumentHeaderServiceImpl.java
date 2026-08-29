@@ -309,8 +309,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
             header.setCreatedBy(emp.getEmail());
             header.setUpdatedBy(emp.getEmail());
 
-            // NOTE: caseId is intentionally NOT set here — it's server-generated
-            // below, once the row has a real primary key to base it on.
             header.setCaseId(null);
 
             log.info("Saving document header");
@@ -409,6 +407,14 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                 forwardingAuthority.setReceivedTime(fa.getReceivedTime());
                 forwardingAuthority.setReceivedBy(fa.getReceivedBy());
                 forwardingAuthority.setRemarks(fa.getRemarks());
+
+                // NEW — messenger/handover fields
+                forwardingAuthority.setMessengerName(fa.getMessengerName());
+                forwardingAuthority.setMessengerDesignation(fa.getMessengerDesignation());
+                forwardingAuthority.setMessengerOrganization(fa.getMessengerOrganization());
+                forwardingAuthority.setMessengerIdRef(fa.getMessengerIdRef());
+                forwardingAuthority.setHandoverDateTime(fa.getHandoverDateTime());
+
                 forwardingAuthority.setCreatedBy(emp.getEmail());
                 forwardingAuthority.setCreatedOn(now);
 
@@ -523,6 +529,9 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
 
         return api;
     }
+
+
+
     @Transactional
     @Override
     public ApiResponse<MessageResponse> updateDocumentWithFiles(
@@ -543,10 +552,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
 
         try {
 
-            // =========================================================
-            // Extract waiting room IDs for rollback tracking
-            // =========================================================
-
             List<Integer> waitingRoomIdsInRequest = filePaths.stream()
                     .filter(fp -> fp.getWaitingRoomId() != null)
                     .map(DocumentSaveRequest.FilePathVersion::getWaitingRoomId)
@@ -556,11 +561,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
 
             log.debug("Found {} waiting room files in update request",
                     waitingRoomIdsInRequest.size());
-
-
-            // =========================================================
-            // 1. Check duplicate fileNo
-            // =========================================================
 
             Optional<DocumentHeader> duplicate =
                     documentHeaderRepository.findByFileNo(
@@ -602,11 +602,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                 );
             }
 
-
-            // =========================================================
-            // 2. Load existing document
-            // =========================================================
-
             DocumentHeader existingDocument =
                     documentHeaderRepository.findById(
                             documentHeader.getId()
@@ -623,11 +618,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                         );
                     });
 
-
-            // =========================================================
-            // 3. Move waiting room files
-            // =========================================================
-
             if (!waitingRoomIdsInRequest.isEmpty()) {
 
                 log.info(
@@ -641,11 +631,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                         existingDocument.getCategoryMaster()
                 );
             }
-
-
-            // =========================================================
-            // 4. Capture previous data for audit
-            // =========================================================
 
             Map<String, Object> previousDocData = Map.of(
                     "title",
@@ -674,7 +659,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                             : null
             );
 
-
             List<DocumentDetailsResponse> previousFileDetails =
                     existingDocument.getDocumentDetails()
                             .stream()
@@ -690,11 +674,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                                 return resp;
                             })
                             .toList();
-
-
-            // =========================================================
-            // 5. Detect category/year changes
-            // =========================================================
 
             Long existingCategoryId =
                     Long.valueOf(existingDocument.getCategoryMaster() != null
@@ -712,12 +691,10 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                             incomingCategoryId
                     );
 
-
             Long incomingYearId =
                     (filePaths != null && !filePaths.isEmpty())
                             ? filePaths.get(0).getYearId()
                             : null;
-
 
             boolean yearChanged =
                     incomingYearId != null
@@ -732,17 +709,11 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                                             .equals(incomingYearId)
                             );
 
-
             log.debug(
                     "Update changes - categoryChanged: {}, yearChanged: {}",
                     categoryChanged,
                     yearChanged
             );
-
-
-            // =========================================================
-            // Update Category
-            // =========================================================
 
             if (categoryChanged
                     && documentHeader.getCategoryMaster() != null
@@ -764,11 +735,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                 );
             }
 
-
-            // =========================================================
-            // Update Year
-            // =========================================================
-
             if (yearChanged && incomingYearId != null) {
 
                 YearMaster yearMaster =
@@ -786,11 +752,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                     detail.setYearMaster(yearMaster);
                 }
             }
-
-
-            // =========================================================
-            // 6. Update basic document fields
-            // =========================================================
 
             existingDocument.setUpdatedOn(
                     Timestamp.from(Instant.now())
@@ -812,11 +773,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                     documentHeader.getSubject()
             );
 
-
-            // =========================================================
-            // CASE INFORMATION
-            // =========================================================
-
             existingDocument.setFirNumber(
                     documentHeader.getFirNumber()
             );
@@ -824,13 +780,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
             existingDocument.setFirDate(
                     documentHeader.getFirDate()
             );
-
-
-            // =========================================================
-            // CASE TYPE
-            // DocumentHeader has:
-            // private CaseTypeMaster caseType;
-            // =========================================================
 
             if (documentHeader.getCaseType() != null
                     && documentHeader.getCaseType().getId() != null) {
@@ -850,11 +799,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                 existingDocument.setCaseType(caseType);
             }
 
-
-            // =========================================================
-            // CRIME TYPE
-            // =========================================================
-
             if (documentHeader.getCrimeType() != null
                     && documentHeader.getCrimeType().getId() != null) {
 
@@ -872,11 +816,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
 
                 existingDocument.setCrimeType(crimeType);
             }
-
-
-            // =========================================================
-            // STATE
-            // =========================================================
 
             if (documentHeader.getState() != null
                     && documentHeader.getState().getId() != null) {
@@ -896,11 +835,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                 existingDocument.setState(state);
             }
 
-
-            // =========================================================
-            // DISTRICT
-            // =========================================================
-
             if (documentHeader.getDistrict() != null
                     && documentHeader.getDistrict().getId() != null) {
 
@@ -918,11 +852,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
 
                 existingDocument.setDistrict(district);
             }
-
-
-            // =========================================================
-            // CITY
-            // =========================================================
 
             if (documentHeader.getCity() != null
                     && documentHeader.getCity().getId() != null) {
@@ -942,11 +871,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                 existingDocument.setCity(city);
             }
 
-
-            // =========================================================
-            // CASE DETAILS
-            // =========================================================
-
             existingDocument.setPoliceStation(
                     documentHeader.getPoliceStation()
             );
@@ -958,11 +882,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
             existingDocument.setCourtReference(
                     documentHeader.getCourtReference()
             );
-
-
-            // =========================================================
-            // PRIORITY
-            // =========================================================
 
             if (documentHeader.getPriority() != null
                     && documentHeader.getPriority().getId() != null) {
@@ -982,11 +901,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                 existingDocument.setPriority(priority);
             }
 
-
-            // =========================================================
-            // INCIDENT INFORMATION
-            // =========================================================
-
             existingDocument.setDateOfIncident(
                     documentHeader.getDateOfIncident()
             );
@@ -995,12 +909,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                     documentHeader.getIncidentLocation()
             );
 
-
-            // =========================================================
-            // EVIDENCE INFORMATION
-            // Header-level only
-            // =========================================================
-
             existingDocument.setEvidenceId(
                     documentHeader.getEvidenceId()
             );
@@ -1008,11 +916,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
             existingDocument.setExhibitNumber(
                     documentHeader.getExhibitNumber()
             );
-
-
-            // =========================================================
-            // 7. Update files
-            // =========================================================
 
             YearMaster yearMasterForFiles = null;
 
@@ -1033,7 +936,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                                 .getYearMaster();
             }
 
-
             List<DocumentDetails> updatedFiles =
                     documentDetailsService.updateFileDetails(
                             existingDocument.getCategoryMaster(),
@@ -1044,7 +946,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                             categoryChanged || yearChanged
                     );
 
-
             existingDocument.setDocumentDetails(
                     updatedFiles
             );
@@ -1052,11 +953,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
             existingDocument.setApprovalStatus(
                     DocApprovalStatus.PENDING
             );
-
-
-            // =========================================================
-            // 8. Save document
-            // =========================================================
 
             DocumentHeader header =
                     documentHeaderRepository.save(
@@ -1067,18 +963,12 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                     "Document updated successfully"
             );
 
-
-            // =========================================================
-            // METADATA UPDATE
-            // =========================================================
-
             if (metadata != null) {
 
                 log.debug(
                         "Processing {} metadata entries for update",
                         metadata.size()
                 );
-
 
                 Map<Long, DocumentMetadata> existingMap =
                         existingDocument
@@ -1092,10 +982,8 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                                         )
                                 );
 
-
                 List<DocumentMetadata> finalList =
                         new ArrayList<>();
-
 
                 for (DocumentSaveRequest.MetadataRequest m :
                         metadata) {
@@ -1106,8 +994,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                         continue;
                     }
 
-
-                    // Existing metadata
                     if (m.getId() > 0
                             && existingMap.containsKey(m.getId())) {
 
@@ -1126,7 +1012,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
 
                     } else {
 
-                        // New metadata
                         DocumentMetadata meta =
                                 new DocumentMetadata();
 
@@ -1152,7 +1037,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                     }
                 }
 
-
                 existingDocument
                         .getMetadataList()
                         .clear();
@@ -1161,11 +1045,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                         .getMetadataList()
                         .addAll(finalList);
             }
-
-
-            // =========================================================
-            // DELETE METADATA
-            // =========================================================
 
             if (deletedMetaDataIds != null
                     && !deletedMetaDataIds.isEmpty()) {
@@ -1179,11 +1058,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                         deletedMetaDataIds
                 );
             }
-
-
-            // =========================================================
-            // 6.1 Update/Create Forwarding Authority
-            // =========================================================
 
             if (forwardingAuthority != null) {
 
@@ -1214,11 +1088,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                                     return fresh;
                                 });
 
-
-                // =====================================================
-                // Forwarding Authority Type
-                // =====================================================
-
                 if (forwardingAuthority
                         .getForwardingAuthorityTypeId() != null) {
 
@@ -1235,7 +1104,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                     );
                 }
 
-
                 faEntity.setAuthorityName(
                         forwardingAuthority.getAuthorityName()
                 );
@@ -1247,11 +1115,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                 faEntity.setOrganisation(
                         forwardingAuthority.getOrganisation()
                 );
-
-
-                // =====================================================
-                // District
-                // =====================================================
 
                 if (forwardingAuthority.getDistrictId() != null) {
 
@@ -1266,11 +1129,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                     faEntity.setDistrict(district);
                 }
 
-
-                // =====================================================
-                // City
-                // =====================================================
-
                 if (forwardingAuthority.getCityId() != null) {
 
                     CityMaster city =
@@ -1283,11 +1141,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
 
                     faEntity.setCity(city);
                 }
-
-
-                // =====================================================
-                // Address / Contact
-                // =====================================================
 
                 faEntity.setAddress(
                         forwardingAuthority.getAddress()
@@ -1313,11 +1166,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                         forwardingAuthority.getForwardingLetterPath()
                 );
 
-
-                // =====================================================
-                // Mode Of Submission
-                // =====================================================
-
                 if (forwardingAuthority.getModeOfSubmissionId() != null) {
 
                     ModeOfSubmissionMaster modeOfSubmission =
@@ -1332,11 +1180,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                             modeOfSubmission
                     );
                 }
-
-
-                // =====================================================
-                // Courier / Dispatch
-                // =====================================================
 
                 faEntity.setCourierAgency(
                         forwardingAuthority.getCourierAgency()
@@ -1374,11 +1217,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                         forwardingAuthority.getNumberOfExhibits()
                 );
 
-
-                // =====================================================
-                // Package Type
-                // =====================================================
-
                 if (forwardingAuthority.getPackageTypeId() != null) {
 
                     PackageTypeMaster packageType =
@@ -1393,11 +1231,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                             packageType
                     );
                 }
-
-
-                // =====================================================
-                // Seal / Package Information
-                // =====================================================
 
                 faEntity.setSealNumber(
                         forwardingAuthority.getSealNumber()
@@ -1431,10 +1264,12 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                         forwardingAuthority.getRemarks()
                 );
 
-
-                // =====================================================
-                // Audit
-                // =====================================================
+                // NEW — messenger/handover fields
+                faEntity.setMessengerName(forwardingAuthority.getMessengerName());
+                faEntity.setMessengerDesignation(forwardingAuthority.getMessengerDesignation());
+                faEntity.setMessengerOrganization(forwardingAuthority.getMessengerOrganization());
+                faEntity.setMessengerIdRef(forwardingAuthority.getMessengerIdRef());
+                faEntity.setHandoverDateTime(forwardingAuthority.getHandoverDateTime());
 
                 faEntity.setUpdatedBy(
                         empObj.getEmail()
@@ -1443,7 +1278,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                 faEntity.setUpdatedOn(
                         Timestamp.from(Instant.now())
                 );
-
 
                 forwardingAuthorityRepository.save(
                         faEntity
@@ -1455,20 +1289,10 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                 );
             }
 
-
-            // =========================================================
-            // Recalculate Header Status
-            // =========================================================
-
             docHeaderStatusService.recalcAndUpdateHeaderStatus(
                     header,
                     empObj.getEmail()
             );
-
-
-            // =========================================================
-            // 9. Update waiting room status to MOVED
-            // =========================================================
 
             if (!waitingRoomIdsInRequest.isEmpty()) {
 
@@ -1482,17 +1306,7 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                 );
             }
 
-
-            // =========================================================
-            // Clear rollback list on success
-            // =========================================================
-
             waitingRoomIdsToRollback.clear();
-
-
-            // =========================================================
-            // 10. Success audit log
-            // =========================================================
 
             for (DocumentDetailsResponse prevFile :
                     previousFileDetails) {
@@ -1518,7 +1332,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                                 prevFile.getDocName()
                         );
 
-
                 auditLogUtil.logDocumentAction(
                         empObj,
                         "UploadDocument",
@@ -1531,11 +1344,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                 );
             }
 
-
-            // =========================================================
-            // SUCCESS
-            // =========================================================
-
             log.info(
                     "SUCCESS → Document Updated | id={} caseId={} title={}",
                     existingDocument.getId(),
@@ -1543,12 +1351,10 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                     existingDocument.getTitle()
             );
 
-
             return ResponseUtils.createSuccessResponse(
                     msg,
                     new TypeReference<>() {}
             );
-
 
         } catch (Exception ex) {
 
@@ -1563,11 +1369,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                     "Document update failed"
             );
 
-
-            // =========================================================
-            // Rollback waiting room
-            // =========================================================
-
             if (!waitingRoomIdsToRollback.isEmpty()) {
 
                 log.info(
@@ -1579,11 +1380,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                         waitingRoomIdsToRollback
                 );
             }
-
-
-            // =========================================================
-            // Failure audit
-            // =========================================================
 
             auditLogUtil.logDocumentAction(
                     empObj,
@@ -1598,7 +1394,6 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
                     ),
                     request
             );
-
 
             return ResponseUtils.createFailureResponse(
                     msg,
@@ -2012,8 +1807,32 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
     @Override
     public List<DocumentHeader> getAllPendingByEmployeeId(Integer employeeId) {
         log.info("API CALL → Get Pending Documents By Employee | employeeId={}", employeeId);
+
         List<DocumentHeader> headers = documentHeaderRepository.findAllPendingByEmployeeId(employeeId);
+
+        if (!headers.isEmpty()) {
+
+            List<Integer> documentIds = headers.stream()
+                    .map(DocumentHeader::getId)
+                    .collect(Collectors.toList());
+
+            // DocumentForwardingAuthority has no back-reference on DocumentHeader,
+            // so it must be fetched separately and attached manually
+            Map<Integer, DocumentForwardingAuthority> forwardingAuthorityMap =
+                    forwardingAuthorityRepository.findByDocumentHeader_IdIn(documentIds)
+                            .stream()
+                            .collect(Collectors.toMap(
+                                    fa -> fa.getDocumentHeader().getId(),
+                                    fa -> fa
+                            ));
+
+            headers.forEach(doc ->
+                    doc.setForwardingAuthority(forwardingAuthorityMap.get(doc.getId()))
+            );
+        }
+
         log.info("SUCCESS → Retrieved {} pending documents for employee ID: {}", headers.size(), employeeId);
+
         return headers;
     }
 
