@@ -1657,7 +1657,13 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
         DocumentHeader updatedDocumentHeader = documentHeaderRepository.save(documentHeader);
 
         try {
-            notificationService.createNewDocumentSavedNotification(updatedDocumentHeader);
+            List<DocumentDetails> details = updatedDocumentHeader.getDocumentDetails();
+            if (details != null && !details.isEmpty()) {
+                DocumentDetails representative = details.get(0);
+                notificationService.createDocumentNotification(representative);
+            } else {
+                log.warn("No document details found for header {} — skipping notification", id);
+            }
         } catch (Exception ex) {
             log.warn("Notification failed for header {}", id, ex);
         }
@@ -1683,7 +1689,8 @@ public class DocumentHeaderServiceImpl implements DocumentHeaderService {
 
         return updatedDocumentHeader;
     }
-    //Delete Document
+
+
     @Override
     public void deleteByIdDocumentHeader(Integer id) {
         log.info("API CALL → Delete Document | id={}", id);

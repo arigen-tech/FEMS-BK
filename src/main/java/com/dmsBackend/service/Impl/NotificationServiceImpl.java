@@ -508,7 +508,7 @@ public class NotificationServiceImpl implements NotificationService {
 
         List<Employee> departmentAdmins = employeeService.findByDepartmentAndRole(
                 newEmployee.getDepartment().getId(),
-                "DEPARTMENT ADMIN"
+                "SCIENTIFIC OFFICER"
         );
 
         String title = "New Employee Added";
@@ -573,7 +573,7 @@ public class NotificationServiceImpl implements NotificationService {
                 newEmployee.getCreatedOn().toString()
         );
 
-        log.info("Found {} department admins for department: {}",
+        log.info("Found {} SCIENTIFIC OFFICERs for department: {}",
                 departmentAdmins.size(), department.getName());
 
         for (Employee admin : departmentAdmins) {
@@ -622,14 +622,14 @@ public class NotificationServiceImpl implements NotificationService {
 
             List<Employee> departmentAdmins = employeeRepository.findByDepartmentIdAndRoleRole(
                     department.getId(),
-                    "DEPARTMENT ADMIN"
+                    "SCIENTIFIC OFFICER"
             );
 
-            log.debug("Found {} department admins for department ID: {}",
+            log.debug("Found {} SCIENTIFIC OFFICERs for department ID: {}",
                     departmentAdmins.size(), department.getId());
 
             if (departmentAdmins.isEmpty()) {
-                log.warn("No department admins found - notification creation stopped");
+                log.warn("No SCIENTIFIC OFFICERs found - notification creation stopped");
                 return;
             }
 
@@ -741,7 +741,7 @@ public class NotificationServiceImpl implements NotificationService {
 
         Map<String, Long> counts = new HashMap<>();
 
-        if ("USER".equals(role)) {
+        if ("CASE & EVIDENCE OFFICER".equals(role)) {
             long userNotificationCount = notificationRepository.countByEmployee_IdAndTypeInAndIsReadFalse(
                     employeeId,
                     Arrays.asList(
@@ -755,7 +755,7 @@ public class NotificationServiceImpl implements NotificationService {
                     )
             );
             counts.put("unreadCount", userNotificationCount);
-        } else if ("DEPARTMENT ADMIN".equals(role)) {
+        } else if ("SCIENTIFIC OFFICER".equals(role)) {
             long newDocumentCount = notificationRepository.countByEmployee_IdAndTypeAndIsReadFalse(
                     employeeId,
                     NotificationType.NEW_DOCUMENT
@@ -768,7 +768,7 @@ public class NotificationServiceImpl implements NotificationService {
 
             long totalCount = newEmployeeCount + newDocumentCount;
             counts.put("unreadCount", totalCount);
-        } else if ("ADMIN".equals(role) || "BRANCH ADMIN".equals(role)) {
+        } else if ("SYSTEM ADMIN".equals(role) || "LABORATORY ADMIN / HOD".equals(role)) {
             long totalCount = notificationRepository.countByEmployee_IdAndIsReadFalse(employeeId);
             counts.put("unreadCount", totalCount);
         }
