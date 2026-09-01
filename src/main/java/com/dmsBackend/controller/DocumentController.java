@@ -114,6 +114,8 @@ public class DocumentController {
     private AuditLogUtil auditLogUtil;
 
     @Autowired
+    private DocumentForwardingAuthorityRepository forwardingAuthorityRepository;
+    @Autowired
     private CurrentUser currentUser;
 
     @Autowired
@@ -1532,6 +1534,141 @@ public class DocumentController {
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @PostMapping("/upload-forwarding-letter")
+    @Transactional
+    public ResponseEntity<Map<String, Object>> uploadForwardingLetter(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("documentId") Integer documentId) {
+
+        log.info("API CALL → Upload Forwarding Letter | documentId={} fileName={}",
+                documentId, file.getOriginalFilename());
+
+        try {
+            if (file.isEmpty()) {
+                log.error("FAILED → Upload Forwarding Letter | reason=Empty File");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("message", "Uploaded file is empty"));
+            }
+
+            // 1️⃣ Load the document header to know branch/department for folder structure
+            DocumentHeader documentHeader = documentHeaderRepository.findById(documentId)
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Document not found with id " + documentId));
+
+            String branch = documentHeader.getBranchMaster() != null
+                    ? documentHeader.getBranchMaster().getName().replace(" ", "_")
+                    : "UnknownBranch";
+            String department = documentHeader.getDepartmentMaster() != null
+                    ? documentHeader.getDepartmentMaster().getName().replace(" ", "_")
+                    : "UnknownDepartment";
+
+            // 2️⃣ Build destination folder: {storagePath}/{branch}/{department}/ForwardingLetters/
+            Path targetDir = Paths.get(documentStoragePath, branch, department, "ForwardingLetters");
+            Files.createDirectories(targetDir);
+
+            // 3️⃣ Build a unique file name so re-uploads don't collide
+            String originalFileName = file.getOriginalFilename();
+            String extension = "";
+            if (originalFileName != null && originalFileName.contains(".")) {
+                extension = originalFileName.substring(originalFileName.lastIndexOf('.'));
+            }
+            String storedFileName = "ForwardingLetter_doc" + documentId + "_"
+                    + System.currentTimeMillis() + extension;
+
+            Path targetFile = targetDir.resolve(storedFileName);
+
+            // 4️⃣ Write the file to disk
+            file.transferTo(targetFile.toFile());
+
+            // 5️⃣ Build the relative path to store in DB (matches your other stored paths' style)
+            String relativePath = String.format("%s/%s/ForwardingLetters/%s",
+                    branch, department, storedFileName);
+
+            // 6️⃣ Load the forwarding authority row for this document and update it
+            DocumentForwardingAuthority faEntity = forwardingAuthorityRepository
+                    .findByDocumentHeader_Id(documentId)
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Forwarding authority not found for document id " + documentId));
+
+            faEntity.setForwardingLetterPath(relativePath);
+            faEntity.setUpdatedOn(new Timestamp(System.currentTimeMillis()));
+
+            forwardingAuthorityRepository.save(faEntity);
+
+            log.info("SUCCESS → Forwarding letter uploaded and path saved | documentId={} path={}",
+                    documentId, relativePath);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Forwarding letter uploaded successfully");
+            response.put("path", relativePath);
+
+            return ResponseEntity.ok(response);
+
+        } catch (ResourceNotFoundException e) {
+            log.error("FAILED → Upload Forwarding Letter | documentId={} reason={}", documentId, e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("message", e.getMessage()));
+
+        } catch (Exception e) {
+            log.error("FAILED → Upload Forwarding Letter | documentId={} reason={}", documentId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Failed to upload forwarding letter: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/download-forwarding-letter/{documentId}")
+    public ResponseEntity<Resource> downloadForwardingLetter(@PathVariable Integer documentId) {
+
+        log.info("API CALL → Download Forwarding Letter | documentId={}", documentId);
+
+        try {
+            DocumentForwardingAuthority faEntity = forwardingAuthorityRepository
+                    .findByDocumentHeader_Id(documentId)
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Forwarding authority not found for document id " + documentId));
+
+            String relativePath = faEntity.getForwardingLetterPath();
+            if (relativePath == null || relativePath.isEmpty()) {
+                log.warn("No forwarding letter path found | documentId={}", documentId);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+            }
+
+            Path filePath = Paths.get(documentStoragePath, relativePath);
+
+            if (!Files.exists(filePath)) {
+                log.warn("Forwarding letter file not found on disk | documentId={} path={}",
+                        documentId, filePath);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+            }
+
+            Resource resource = new UrlResource(filePath.toUri());
+            if (!resource.exists() || !resource.isReadable()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+            }
+
+            String mimeType = Files.probeContentType(filePath);
+            if (mimeType == null) {
+                mimeType = "application/octet-stream";
+            }
+
+            log.info("SUCCESS → Forwarding letter served | documentId={}", documentId);
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(mimeType))
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "inline; filename=\"" + filePath.getFileName() + "\"")
+                    .body(resource);
+
+        } catch (ResourceNotFoundException e) {
+            log.error("FAILED → Download Forwarding Letter | documentId={} reason={}", documentId, e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+
+        } catch (Exception e) {
+            log.error("FAILED → Download Forwarding Letter | documentId={} reason={}", documentId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
 

@@ -539,7 +539,7 @@ public class EmployeeController {
             }
 
             boolean isAdmin = currentUser.getAuthorities().stream()
-                    .anyMatch(authority -> authority.getAuthority().equals("ADMIN"));
+                    .anyMatch(authority -> authority.getAuthority().equals("SYSTEM ADMIN"));
 
             log.debug("User authentication check | userId={} isAdmin={}",
                     currentEmployee.getId(), isAdmin);

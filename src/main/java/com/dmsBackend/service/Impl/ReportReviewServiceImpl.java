@@ -245,16 +245,69 @@ public class ReportReviewServiceImpl implements ReportReviewService {
             ReportEntry report = reportEntryRepository.findById(reportEntryId)
                     .orElseThrow(() -> new ResourceNotFoundException("Report not found: " + reportEntryId));
 
-            if (!"APPROVE".equalsIgnoreCase(action) && !"REJECT".equalsIgnoreCase(action)) {
-                msg.setMsg("Invalid action. Must be APPROVE or REJECT");
+            if (!"APPROVE".equalsIgnoreCase(action)
+                    && !"REJECT".equalsIgnoreCase(action)
+                    && !"SAVE".equalsIgnoreCase(action)) {
+                msg.setMsg("Invalid action. Must be SAVE, APPROVE or REJECT");
                 api.setStatus(HttpStatus.BAD_REQUEST.value());
                 api.setMessage(msg.getMsg());
                 api.setResponse(msg);
                 return api;
             }
 
-            String newStatus = "APPROVE".equalsIgnoreCase(action) ? "APPROVED" : "REJECTED";
             Timestamp now = new Timestamp(System.currentTimeMillis());
+            String savedFinalReportPath = null;
+
+            if ("SAVE".equalsIgnoreCase(action)) {
+                // Just persist the remarks/comments (and optional attachment) —
+                // do NOT touch reviewStatus, status, reviewedBy, reviewedOn.
+                report.setReviewComments(comments);
+
+                if (finalReport != null && !finalReport.isEmpty()) {
+                    Path reportDir = Paths.get(reportStoragePath, "reviewed_reports", "report_" + reportEntryId);
+                    Files.createDirectories(reportDir);
+
+                    String safeName = System.currentTimeMillis() + "_" +
+                            finalReport.getOriginalFilename().replaceAll("[^a-zA-Z0-9._-]", "_");
+                    Path dest = reportDir.resolve(safeName);
+
+                    try (InputStream in = finalReport.getInputStream()) {
+                        Files.copy(in, dest, StandardCopyOption.REPLACE_EXISTING);
+                    }
+
+                    savedFinalReportPath = dest.toString();
+                    report.setFinalReportPath(savedFinalReportPath);
+                }
+
+                reportEntryRepository.save(report);
+
+                if (documentDetailId != null) {
+                    DocumentDetails doc = documentDetailsRepository.findById(documentDetailId).orElse(null);
+                    if (doc != null) {
+                        doc.setReviewComments(comments);
+                        if (savedFinalReportPath != null) {
+                            doc.setFinalReportPath(savedFinalReportPath);
+                        }
+                        documentDetailsRepository.save(doc);
+                    } else {
+                        log.warn("documentDetailId={} not found while saving reportEntryId={}",
+                                documentDetailId, reportEntryId);
+                    }
+                }
+
+                msg.setMsg("Report saved successfully");
+                api.setStatus(HttpStatus.OK.value());
+                api.setMessage("Success");
+                api.setResponse(msg);
+
+                log.info("SUCCESS → Report SAVED | reportEntryId={} documentDetailId={} reviewerId={}",
+                        reportEntryId, documentDetailId, me.getId());
+
+                return api;
+            }
+
+            // ── APPROVE / REJECT path (status-changing) ──
+            String newStatus = "APPROVE".equalsIgnoreCase(action) ? "APPROVED" : "REJECTED";
 
             report.setReviewStatus(newStatus);
             if ("APPROVE".equalsIgnoreCase(action)) {
@@ -270,7 +323,6 @@ public class ReportReviewServiceImpl implements ReportReviewService {
                 report.setSubmittedOn(null); // clears "submitted" state so it reappears as pending work
             }
 
-            String savedFinalReportPath = null;
             if (finalReport != null && !finalReport.isEmpty()) {
                 Path reportDir = Paths.get(reportStoragePath, "reviewed_reports", "report_" + reportEntryId);
                 Files.createDirectories(reportDir);
