@@ -495,19 +495,33 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     @Transactional
     public void createNewEmployeeNotification(Employee newEmployee) {
-
         log.info("API CALL → Create New Employee Notification | employeeId={} name={}",
                 newEmployee.getId(), newEmployee.getName());
 
+        // Null checks for department
         DepartmentMaster department = newEmployee.getDepartment();
-        if (department == null || department.getName() == null) {
+        if (department == null || department.getId() == null) {
+            log.warn("Employee {} has no department assigned, skipping notifications",
+                    newEmployee.getId());
+            return;
+        }
+
+        if (department.getName() == null) {
             log.debug("Fetching department details for employee ID: {}", newEmployee.getId());
-            department = departmentMasterService.findById(newEmployee.getDepartment().getId());
+            department = departmentMasterService.findById(department.getId());
+            if (department == null) {
+                log.warn("Department not found for ID: {}, skipping notifications",
+                        newEmployee.getDepartment().getId());
+                return;
+            }
             newEmployee.setDepartment(department);
         }
 
+        // Safe department name
+        String departmentName = department.getName() != null ? department.getName() : "Unknown Department";
+
         List<Employee> departmentAdmins = employeeService.findByDepartmentAndRole(
-                newEmployee.getDepartment().getId(),
+                department.getId(),
                 "SCIENTIFIC OFFICER"
         );
 
@@ -515,86 +529,70 @@ public class NotificationServiceImpl implements NotificationService {
         String message = String.format(
                 "%s is added in your %s. Please assign a role.",
                 newEmployee.getName(),
-                newEmployee.getDepartment().getName()
+                departmentName
         );
 
+        // ... rest of the method with safe null checks
         String detailedMessage = String.format("""
-        <!DOCTYPE html>
-        <html lang='en'>
-        <head>
-        <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            table { width: 100%%; border-collapse: collapse; }
-            th, td { padding: 10px; border-bottom: 1px solid #ddd; }
-            th { background-color: #f2f2f2; }
-            .highlight { color: #2196F3; font-weight: bold; }
-        </style>
-        </head>
-        <body>
-        <h2>New Employee Notification</h2>
-        <table>
-            <tr>
-                <th>Employee Name</th>
-                <td class='highlight'>%s</td>
-            </tr>
-            <tr>
-                <th>Employee ID</th>
-                <td>%s</td>
-            </tr>
-            <tr>
-                <th>Email</th>
-                <td>%s</td>
-            </tr>
-            <tr>
-                <th>Department</th>
-                <td>%s</td>
-            </tr>
-            <tr>
-                <th>Branch</th>
-                <td>%s</td>
-            </tr>
-            <tr>
-                <th>Joined Date</th>
-                <td>%s</td>
-            </tr>
-        </table>
-        <p><strong>Note:</strong> Please ensure to welcome the new employee and provide necessary assistance.</p>
-        <div class='footer'>
-            <p>Best regards,<br>The HR Team</p>
-        </div>
-        </body>
-        </html>
-        """,
-                newEmployee.getName(),
-                newEmployee.getId(),
-                newEmployee.getEmail(),
-                department.getName(),
-                newEmployee.getBranch().getName(),
-                newEmployee.getCreatedOn().toString()
+    <!DOCTYPE html>
+    <html lang='en'>
+    <head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        table { width: 100%%; border-collapse: collapse; }
+        th, td { padding: 10px; border-bottom: 1px solid #ddd; }
+        th { background-color: #f2f2f2; }
+        .highlight { color: #2196F3; font-weight: bold; }
+    </style>
+    </head>
+    <body>
+    <h2>New Employee Notification</h2>
+    <table>
+        <tr><th>Employee Name</th><td class='highlight'>%s</td></tr>
+        <tr><th>Employee ID</th><td>%s</td></tr>
+        <tr><th>Email</th><td>%s</td></tr>
+        <tr><th>Department</th><td>%s</td></tr>
+        <tr><th>Branch</th><td>%s</td></tr>
+        <tr><th>Joined Date</th><td>%s</td></tr>
+    </table>
+    <p><strong>Note:</strong> Please ensure to welcome the new employee and provide necessary assistance.</p>
+    <div class='footer'><p>Best regards,<br>The HR Team</p></div>
+    </body>
+    </html>
+    """,
+                newEmployee.getName() != null ? newEmployee.getName() : "Unknown",
+                newEmployee.getId() != null ? newEmployee.getId() : 0,
+                newEmployee.getEmail() != null ? newEmployee.getEmail() : "N/A",
+                departmentName,
+                newEmployee.getBranch() != null && newEmployee.getBranch().getName() != null ?
+                        newEmployee.getBranch().getName() : "N/A",
+                newEmployee.getCreatedOn() != null ? newEmployee.getCreatedOn().toString() : "N/A"
         );
 
         log.info("Found {} SCIENTIFIC OFFICERs for department: {}",
-                departmentAdmins.size(), department.getName());
+                departmentAdmins != null ? departmentAdmins.size() : 0, departmentName);
 
-        for (Employee admin : departmentAdmins) {
-            Notification notification = Notification.builder()
-                    .employee(admin)
-                    .title(title)
-                    .message(message)
-                    .detailedMessage(detailedMessage)
-                    .type(NotificationType.NEW_EMPLOYEE_ADDED)
-                    .isRead(false)
-                    .referenceId(newEmployee.getId())
-                    .referenceType("EMPLOYEE")
-                    .createdOn(new Timestamp(System.currentTimeMillis()))
-                    .build();
+        if (departmentAdmins != null && !departmentAdmins.isEmpty()) {
+            for (Employee admin : departmentAdmins) {
+                Notification notification = Notification.builder()
+                        .employee(admin)
+                        .title(title)
+                        .message(message)
+                        .detailedMessage(detailedMessage)
+                        .type(NotificationType.NEW_EMPLOYEE_ADDED)
+                        .isRead(false)
+                        .referenceId(newEmployee.getId())
+                        .referenceType("EMPLOYEE")
+                        .createdOn(new Timestamp(System.currentTimeMillis()))
+                        .build();
 
-            notificationRepository.save(notification);
-            log.debug("Created new employee notification for admin ID: {}", admin.getId());
+                notificationRepository.save(notification);
+                log.debug("Created new employee notification for admin ID: {}", admin.getId());
+            }
         }
 
         log.info("SUCCESS → New Employee Notifications Created | employeeId={} adminsNotified={}",
-                newEmployee.getId(), departmentAdmins.size());
+                newEmployee.getId(), departmentAdmins != null ? departmentAdmins.size() : 0);
     }
 
     // ======================= CREATE NEW DOCUMENT SAVED NOTIFICATION =======================
