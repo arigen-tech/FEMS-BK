@@ -15,4 +15,5 @@ public class DispatchListItem {
     private String divisionName;
     private Timestamp approvedDate;
     private String dispatchStatus;
+    private boolean readOnly;
 }

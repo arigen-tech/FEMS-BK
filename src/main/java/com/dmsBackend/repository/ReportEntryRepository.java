@@ -36,4 +36,50 @@ public interface ReportEntryRepository extends JpaRepository<ReportEntry, Intege
     List<ReportEntry> findByReviewStatus(@Param("reviewStatus") String reviewStatus);
 
     List<ReportEntry> findByDocumentHeader_Id(Integer documentHeaderId);
+
+
+
+
+        // ───────── Dispatch Dashboard Counts ─────────
+
+        // Reports dispatched today — system-wide
+        @Query("SELECT COUNT(r) FROM ReportEntry r " +
+                "WHERE r.dispatchStatus = 'DISPATCHED' " +
+                "AND CAST(r.dispatchedOn AS date) = CURRENT_DATE")
+        long countDispatchedToday();
+
+        // Approved reports still awaiting dispatch — system-wide
+        @Query("SELECT COUNT(r) FROM ReportEntry r " +
+                "WHERE r.reviewStatus = 'APPROVED' " +
+                "AND (r.dispatchStatus IS NULL OR r.dispatchStatus <> 'DISPATCHED')")
+        long countDispatchPending();
+
+        // ───────── Branch-scoped ─────────
+        @Query("SELECT COUNT(r) FROM ReportEntry r " +
+                "WHERE r.dispatchStatus = 'DISPATCHED' " +
+                "AND CAST(r.dispatchedOn AS date) = CURRENT_DATE " +
+                "AND r.employee.branch.id = :branchId")
+        long countDispatchedTodayByBranch(@Param("branchId") Integer branchId);
+
+        @Query("SELECT COUNT(r) FROM ReportEntry r " +
+                "WHERE r.reviewStatus = 'APPROVED' " +
+                "AND (r.dispatchStatus IS NULL OR r.dispatchStatus <> 'DISPATCHED') " +
+                "AND r.employee.branch.id = :branchId")
+        long countDispatchPendingByBranch(@Param("branchId") Integer branchId);
+
+        // ───────── Department-scoped ─────────
+        @Query("SELECT COUNT(r) FROM ReportEntry r " +
+                "WHERE r.dispatchStatus = 'DISPATCHED' " +
+                "AND CAST(r.dispatchedOn AS date) = CURRENT_DATE " +
+                "AND r.employee.department.id = :departmentId")
+        long countDispatchedTodayByDepartment(@Param("departmentId") Integer departmentId);
+
+        @Query("SELECT COUNT(r) FROM ReportEntry r " +
+                "WHERE r.reviewStatus = 'APPROVED' " +
+                "AND (r.dispatchStatus IS NULL OR r.dispatchStatus <> 'DISPATCHED') " +
+                "AND r.employee.department.id = :departmentId")
+        long countDispatchPendingByDepartment(@Param("departmentId") Integer departmentId);
+
+
+
 }

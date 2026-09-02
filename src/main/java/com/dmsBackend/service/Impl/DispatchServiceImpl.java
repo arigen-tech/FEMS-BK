@@ -48,16 +48,19 @@ public class DispatchServiceImpl implements DispatchService {
         List<DispatchListItem> result = new ArrayList<>();
 
         for (ReportEntry report : approvedReports) {
-            // Skip already dispatched reports
-            if ("DISPATCHED".equals(report.getDispatchStatus())) {
-                continue;
-            }
+
+            String dispatchStatus = report.getDispatchStatus() != null
+                    ? report.getDispatchStatus()
+                    : "PENDING";
 
             DispatchListItem item = new DispatchListItem();
             item.setReportEntryId(report.getId());
             item.setReportNumber("RPT-" + String.format("%03d", report.getId()));
             item.setApprovedDate(report.getReviewedOn());
-            item.setDispatchStatus(report.getDispatchStatus() != null ? report.getDispatchStatus() : "PENDING");
+            item.setDispatchStatus(dispatchStatus);
+
+            // If already dispatched, mark as read-only for the frontend
+            item.setReadOnly("DISPATCHED".equals(dispatchStatus));
 
             if (report.getDocumentHeader() != null) {
                 item.setCaseNumber(report.getDocumentHeader().getFileNo());
@@ -71,7 +74,7 @@ public class DispatchServiceImpl implements DispatchService {
             result.add(item);
         }
 
-        log.info("SUCCESS → Found {} pending dispatches", result.size());
+        log.info("SUCCESS → Found {} dispatch entries (pending + dispatched)", result.size());
         return result;
     }
 

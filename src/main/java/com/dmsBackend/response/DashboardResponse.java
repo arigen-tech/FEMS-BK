@@ -54,6 +54,13 @@ public class DashboardResponse {
     private long trashTotalDocByBranch;
     private long trashTotalDocByDepartment;
 
+    // ───────── Dispatch counts ─────────
+    private long dispatchedToday;
+    private long dispatchPending;
+    private long dispatchedTodayByBranch;
+    private long dispatchPendingByBranch;
+    private long dispatchedTodayByDepartment;
+    private long dispatchPendingByDepartment;
 
 
 

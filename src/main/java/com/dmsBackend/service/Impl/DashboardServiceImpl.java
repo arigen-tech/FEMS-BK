@@ -64,6 +64,10 @@ public class DashboardServiceImpl implements DashboardService {
     @Autowired
     private LanguageMasterRepository languageMasterRepository;
 
+    // NEW — needed for dispatch counts
+    @Autowired
+    private ReportEntryRepository reportEntryRepository;
+
     @Override
     public DashboardResponse getAllUsers(String employeeId) {
         log.info("API CALL → Get Dashboard Data | employeeId={}", employeeId);
@@ -87,9 +91,6 @@ public class DashboardServiceImpl implements DashboardService {
                 employee.getName(), branchId, departmentId);
 
         // ───────── General (system-wide) counts ─────────
-        // NOTE: totalDocument / pendingDocument below are kept as-is from your
-        // original code (detail-row counts) since they're used only as raw
-        // storage/file stats, not as the case-approval badges shown in the sidebar.
         dashboardResponse.setTotalUser(employeeRepository.count());
         dashboardResponse.setTotalDocument(documentDetailRepository.countTotalDetails());
         dashboardResponse.setPendingDocument(documentDetailRepository.count());
@@ -112,6 +113,10 @@ public class DashboardServiceImpl implements DashboardService {
 
         dashboardResponse.setTotalUserApplications(userApplicationRepository.count());
         dashboardResponse.setTotalTemplate(masTemplateRepo.count());
+
+        // ───────── Dispatch counts — system-wide (NEW) ─────────
+        dashboardResponse.setDispatchedToday(reportEntryRepository.countDispatchedToday());
+        dashboardResponse.setDispatchPending(reportEntryRepository.countDispatchPending());
 
         // User-specific counts
         long createdByCount = employeeRepository.countByCreatedById(empId);
@@ -146,7 +151,6 @@ public class DashboardServiceImpl implements DashboardService {
         if (branchId != null) {
             log.debug("Processing branch-specific counts | branchId={}", branchId);
 
-            // Branch user counts
             dashboardResponse.setBranchUser(employeeRepository.countByBranchId(branchId));
             dashboardResponse.setDepartmentCountForBranch(departmentMasterRepository.countByBranchId(branchId));
             dashboardResponse.setNullRoleEmployeeCountForBranch(employeeRepository.countByBranchIdAndRoleIsNull(branchId));
@@ -156,13 +160,16 @@ public class DashboardServiceImpl implements DashboardService {
             dashboardResponse.setTotalPendingDocumentsById(documentHeaderService.countPendingDocumentsByBranchId(branchId));
             dashboardResponse.setTotalApprovedStatusDocById(documentHeaderService.countApprovedByBranchId(branchId));
             dashboardResponse.setTotalRejectedStatusDocById(documentHeaderService.countRejectedByBranchId(branchId));
+
+            // ───────── Dispatch counts — branch-scoped (NEW) ─────────
+            dashboardResponse.setDispatchedTodayByBranch(reportEntryRepository.countDispatchedTodayByBranch(branchId));
+            dashboardResponse.setDispatchPendingByBranch(reportEntryRepository.countDispatchPendingByBranch(branchId));
         }
 
         // Department-specific counts (if employee has department)
         if (departmentId != null) {
             log.debug("Processing department-specific counts | departmentId={}", departmentId);
 
-            // Department user counts
             dashboardResponse.setDepartmentUser(employeeRepository.countByDepartmentId(departmentId));
             dashboardResponse.setNullRoleEmployeeCountForDepartment(employeeRepository.countByDepartmentIdAndRoleIsNull(departmentId));
 
@@ -171,13 +178,16 @@ public class DashboardServiceImpl implements DashboardService {
             dashboardResponse.setTotalPendingDocumentsByDepartmentId(documentHeaderService.countPendingDocumentsByDepartmentId(departmentId));
             dashboardResponse.setTotalApprovedStatusDocByDepartmentId(documentHeaderService.countApprovedByDepartmentId(departmentId));
             dashboardResponse.setTotalRejectedStatusDocByDepartmentId(documentHeaderService.countRejectedByDepartmentId(departmentId));
+
+            // ───────── Dispatch counts — department-scoped (NEW) ─────────
+            dashboardResponse.setDispatchedTodayByDepartment(reportEntryRepository.countDispatchedTodayByDepartment(departmentId));
+            dashboardResponse.setDispatchPendingByDepartment(reportEntryRepository.countDispatchPendingByDepartment(departmentId));
         }
 
         // For SYSTEM ADMIN (no branch/department)
         if (branchId == null && departmentId == null) {
             log.debug("Processing system admin counts");
 
-            // Admin counts
             dashboardResponse.setBranchUser(employeeRepository.count());
             dashboardResponse.setDepartmentUser(employeeRepository.count());
             dashboardResponse.setNullRoleEmployeeCountForBranch(employeeRepository.countByRoleIsNull());
@@ -192,6 +202,14 @@ public class DashboardServiceImpl implements DashboardService {
             dashboardResponse.setTotalApprovedStatusDocByDepartmentId(documentHeaderService.countApprovedDocuments());
             dashboardResponse.setTotalRejectedStatusDocById(documentHeaderService.countRejectedDocuments());
             dashboardResponse.setTotalRejectedStatusDocByDepartmentId(documentHeaderService.countRejectedDocuments());
+
+            // System admin sees the global dispatch numbers already set above,
+            // but mirror them into the branch/department fields too so the
+            // frontend doesn't need special-casing for admins.
+            dashboardResponse.setDispatchedTodayByBranch(dashboardResponse.getDispatchedToday());
+            dashboardResponse.setDispatchPendingByBranch(dashboardResponse.getDispatchPending());
+            dashboardResponse.setDispatchedTodayByDepartment(dashboardResponse.getDispatchedToday());
+            dashboardResponse.setDispatchPendingByDepartment(dashboardResponse.getDispatchPending());
         }
 
         log.info("SUCCESS → Dashboard Data Retrieved | employeeId={} name={} totalUsers={} totalDocs={}",
